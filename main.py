@@ -15,13 +15,12 @@ init_logger(prepare_dir(log_dir) + "log.txt")
 info_dict = get_arg_dict(args)
 
 # Runner
-from model_DIDA.runner import Runner
+from runner import Runner
 from model_DIDA.model import DGNN
-
 from model_TokenGT.model_tokengt import TokenGTModel
 
-# model = DGNN(args=args).to(args.device)
-model = TokenGTModel.build_model().to(args.device)
+model = DGNN(args=args).to(args.device)
+# model = TokenGTModel.build_model().to(args.device)
 runner = Runner(args, model, data)
 results = runner.run()
 

@@ -1,4 +1,5 @@
 /data
 /**/*.pyc
 *.egg-info
+/model_TokenGT/fairseq_cli_ln_to_site_packages
 .vscode
