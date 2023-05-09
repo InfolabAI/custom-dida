@@ -1,4 +1,4 @@
-from DIDA.utils.mp import *
+from model_DIDA.utils.mp import *
 import os
 import pandas as pd
 import shutil
