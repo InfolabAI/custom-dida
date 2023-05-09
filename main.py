@@ -22,7 +22,6 @@ from model_TokenGT.model_tokengt import TokenGTModel
 
 # model = DGNN(args=args).to(args.device)
 model = TokenGTModel.build_model().to(args.device)
-breakpoint()
 runner = Runner(args, model, data)
 results = runner.run()
 

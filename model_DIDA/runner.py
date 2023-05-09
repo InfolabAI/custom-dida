@@ -39,7 +39,7 @@ class Runner(object):
         args = self.args
         self.model.train()
         optimizer = self.optimizer
-        conf_opt = self.conf_opt
+        conf_opt = self.conf_opt  # authors do not use this optimizer
 
         embeddings, cs, ss = self.model(
             [
@@ -216,13 +216,13 @@ class Runner(object):
             lr=args.lr,
             weight_decay=args.weight_decay,
         )
-        breakpoint()
-        if args.learns:
-            self.conf_opt = optim.Adam(
-                [p for n, p in self.model.named_parameters() if "ss" in n],
-                lr=args.lr,
-                weight_decay=args.weight_decay,
-            )
+        self.conf_opt = None
+        # if args.learns:
+        #    self.conf_opt = optim.Adam(
+        #        [p for n, p in self.model.named_parameters() if "ss" in n],
+        #        lr=args.lr,
+        #        weight_decay=args.weight_decay,
+        #    )
 
         t_total0 = time.time()
         max_auc = 0
