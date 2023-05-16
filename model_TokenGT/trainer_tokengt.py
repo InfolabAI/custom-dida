@@ -1,7 +1,8 @@
-from ..trainer import Trainer
+from trainer import Trainer
 from model_DIDA.utils.inits import prepare
 from torch_geometric.utils import negative_sampling
 from model_DIDA.utils.mutils import *
+from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
 
 
 class Trainer_TokenGT(Trainer):
@@ -18,13 +19,12 @@ class Trainer_TokenGT(Trainer):
         optimizer = self.runnerProperty.optimizer
         # conf_opt = self.runnerProperty.conf_opt  # authors do not use this optimizer
 
-        embeddings, cs, ss = self.model(
-            [
-                data["edge_index_list"][ix].long().to(args.device)
-                for ix in range(self.runnerProperty.len)
-            ],
-            self.runnerProperty.x,
-        )
+        dataset = TokenGTDataset(self.runnerProperty.x, data, args.device)
+        for index in range(len(dataset)):
+            batch = dataset[index]
+            embeddings, cs, ss = self.model(batch)
+            breakpoint()
+
         device = cs[0].device
         ss = [s.detach() for s in ss]
 
@@ -50,8 +50,9 @@ class Trainer_TokenGT(Trainer):
         edge_label = []
         epoch_losses = []
         tsize = []
+        ## edge label construction
         for t in range(self.runnerProperty.len_train - 1):
-            z = embeddings[t]
+            z = embeddings[t]  # only used for obtaining dimension
             pos_edge_index = prepare(data, t + 1)[0]
             if args.dataset == "yelp":
                 neg_edge_index = bi_negative_sampling(

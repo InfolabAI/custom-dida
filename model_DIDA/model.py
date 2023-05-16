@@ -293,6 +293,7 @@ class DGNN(nn.Module):
         glorot(self.feat)
 
     def forward(self, edge_index_list, x_list):
+        breakpoint()
         if x_list is None:
             x_list = [self.linear(self.feat) for i in range(len(edge_index_list))]
         else:

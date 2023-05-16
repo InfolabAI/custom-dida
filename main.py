@@ -2,12 +2,14 @@ from model_DIDA.config import args
 from model_DIDA.utils.mutils import *
 from model_DIDA.utils.data_util import *
 from model_DIDA.utils.util import init_logger
+from model_TokenGT.dataset_handler_tokengt import test
 import warnings
 
 warnings.simplefilter("ignore")
 
 # load data
 args, data = load_data(args)
+test(args, data)
 
 # pre-logs
 log_dir = args.log_dir
@@ -19,8 +21,8 @@ from runner import Runner
 from model_DIDA.model import DGNN
 from model_TokenGT.model_tokengt import TokenGTModel
 
-model = DGNN(args=args).to(args.device)
-# model = TokenGTModel.build_model().to(args.device)
+# model = DGNN(args=args).to(args.device)
+model = TokenGTModel.build_model().to(args.device)
 runner = Runner(args, model, data)
 results = runner.run()
 

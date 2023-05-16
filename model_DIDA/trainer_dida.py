@@ -19,6 +19,15 @@ class Trainer_DIDA(Trainer):
         optimizer = self.runnerProperty.optimizer
         # conf_opt = self.runnerProperty.conf_opt  # authors do not use this optimizer
 
+        # Q: what is data["edge_index_list"]?
+        # A: data["edge_index_list"] is a list of edge_index tensors, each of which is a 2xN tensor
+        # Q: what is data['edge_index_list'][ix]?
+        # A: data['edge_index_list'][ix] is a 2xN tensor
+        # Q: what is cs?
+        # A: cs is a list of tensors, each of which is a 2xN tensor
+        # Q: what is difference between cs and ss?
+        # A: cs is the output of the causal decoder, ss is the output of the spatial decoder
+        breakpoint()
         embeddings, cs, ss = self.model(
             [
                 data["edge_index_list"][ix].long().to(args.device)
@@ -51,8 +60,9 @@ class Trainer_DIDA(Trainer):
         edge_label = []
         epoch_losses = []
         tsize = []
+        ## edge label construction
         for t in range(self.runnerProperty.len_train - 1):
-            z = embeddings[t]
+            z = embeddings[t]  # only used for obtaining dimension
             pos_edge_index = prepare(data, t + 1)[0]
             if args.dataset == "yelp":
                 neg_edge_index = bi_negative_sampling(

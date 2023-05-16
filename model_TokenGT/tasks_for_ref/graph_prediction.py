@@ -16,14 +16,14 @@ from fairseq.data import (
 )
 from fairseq.tasks import FairseqDataclass, FairseqTask, register_task
 
-from ..data.dataset import (
+from data_for_ref.dataset import (
     BatchedDataDataset,
     TargetDataset,
     TokenGTDataset,
     EpochShuffleDataset,
 )
 
-from ..data import DATASET_REGISTRY
+from data import DATASET_REGISTRY
 import sys
 import os
 
@@ -118,7 +118,7 @@ class GraphPredictionConfig(FairseqDataclass):
         default="",
         metadata={"help": "path to the module of user-defined dataset"},
     )
-    
+
 
 @register_task("graph_prediction", dataclass=GraphPredictionConfig)
 class GraphPredictionTask(FairseqTask):
@@ -138,7 +138,7 @@ class GraphPredictionTask(FairseqTask):
                     train_idx=dataset_dict["train_idx"],
                     valid_idx=dataset_dict["valid_idx"],
                     test_idx=dataset_dict["test_idx"],
-                    seed=cfg.seed
+                    seed=cfg.seed,
                 )
             else:
                 raise ValueError(
@@ -148,7 +148,7 @@ class GraphPredictionTask(FairseqTask):
             self.dm = TokenGTDataset(
                 dataset_spec=cfg.dataset_name,
                 dataset_source=cfg.dataset_source,
-                seed=cfg.seed
+                seed=cfg.seed,
             )
 
     def __import_user_defined_datasets(self, dataset_dir):
@@ -159,9 +159,9 @@ class GraphPredictionTask(FairseqTask):
         for file in os.listdir(dataset_dir):
             path = os.path.join(dataset_dir, file)
             if (
-                    not file.startswith("_")
-                    and not file.startswith(".")
-                    and (file.endswith(".py") or os.path.isdir(path))
+                not file.startswith("_")
+                and not file.startswith(".")
+                and (file.endswith(".py") or os.path.isdir(path))
             ):
                 task_name = file[: file.find(".py")] if file.endswith(".py") else file
                 importlib.import_module(module_name + "." + task_name)
@@ -189,7 +189,7 @@ class GraphPredictionTask(FairseqTask):
             batched_data,
             max_node=self.max_nodes(),
             multi_hop_max_dist=self.cfg.multi_hop_max_dist,
-            spatial_pos_max=self.cfg.spatial_pos_max
+            spatial_pos_max=self.cfg.spatial_pos_max,
         )
 
         data_sizes = np.array([self.max_nodes()] * len(batched_data))
@@ -207,9 +207,7 @@ class GraphPredictionTask(FairseqTask):
 
         if split == "train" and self.cfg.train_epoch_shuffle:
             dataset = EpochShuffleDataset(
-                dataset,
-                num_samples=len(dataset),
-                seed=self.cfg.seed
+                dataset, num_samples=len(dataset), seed=self.cfg.seed
             )
 
         logger.info("Loaded {0} with #samples: {1}".format(split, len(dataset)))
