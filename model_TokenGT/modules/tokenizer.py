@@ -277,7 +277,13 @@ class GraphFeatureTokenizer(nn.Module):
         device = node_feature.device
         dtype = node_feature.dtype
 
-        padded_index, padded_feature, padding_mask, _, _ = self.get_batch(
+        (
+            padded_index,
+            padded_feature,
+            padding_mask,
+            padded_node_mask,
+            _,
+        ) = self.get_batch(
             node_feature, edge_index, edge_feature, node_num, edge_num, perturb
         )
         node_mask = self.get_node_mask(
@@ -337,13 +343,14 @@ class GraphFeatureTokenizer(nn.Module):
         if self.type_id:
             padded_feature = padded_feature + self.get_type_embed(padded_index)
 
-        padded_feature, padding_mask = self.add_special_tokens(
-            padded_feature, padding_mask
-        )  # [B, 2+T, D], [B, 2+T]
+        # padded_feature, padding_mask = self.add_special_tokens(
+        #    padded_feature, padding_mask
+        # )  # [B, 2+T, D], [B, 2+T]
 
         padded_feature = padded_feature.masked_fill(padding_mask[..., None], float("0"))
         return (
             padded_feature,
             padding_mask,
             padded_index,
+            padded_node_mask
         )  # [B, 2+T, D], [B, 2+T], [B, T, 2]

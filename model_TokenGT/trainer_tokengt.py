@@ -22,8 +22,8 @@ class Trainer_TokenGT(Trainer):
         dataset = TokenGTDataset(self.runnerProperty.x, data, args.device)
         for index in range(len(dataset)):
             batch = dataset[index]
-            embeddings, cs, ss = self.model(batch)
             breakpoint()
+            embeddings, cs, ss = self.model(batch)
 
         device = cs[0].device
         ss = [s.detach() for s in ss]

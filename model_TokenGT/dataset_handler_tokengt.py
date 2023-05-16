@@ -29,13 +29,13 @@ class TokenGTDataset(torch.utils.data.Dataset):
             yield cur_edges[:, subedges], cur_edge_data[subedges]
 
         # yield the remaining subedges
-        yield cur_edges[:, pool_edges], cur_edge_data[subedges]
+        yield cur_edges[:, pool_edges], cur_edge_data[pool_edges]
 
     def convert_to_tokengt_input(self, time_t):
         cur_pedges = self.data["pedges"][time_t].long()
         cur_nedges = self.data["nedges"][time_t].long()
         cur_edges = torch.cat([cur_pedges, cur_nedges], dim=1)
-        cur_x = self.x
+        cur_x = self.x[time_t]
         cur_edge_data = torch.ones(cur_edges.shape[1], cur_x.shape[1])
         # select x from edges
         ## cur_x_for_edges = cur_x[cur_edges.unique()]
@@ -72,7 +72,6 @@ class TokenGTDataset(torch.utils.data.Dataset):
         node_data = torch.concat(node_data, dim=0).to(self.device)
         edge_data = torch.concat(edge_data, dim=0).to(self.device)
         edge_index = torch.concat(edge_index, dim=1).to(self.device)
-        breakpoint()
 
         a_graph_at_a_time = {
             "node_data": node_data,
@@ -94,8 +93,8 @@ class TokenGTDataset(torch.utils.data.Dataset):
         return num_time_stamps
 
 
-def test(args, data):
-    dataset = TokenGTDataset(data["x"], data["train"], args.device)
+def test(args, x, data):
+    dataset = TokenGTDataset(x, data, args.device)
     for index in range(len(dataset)):
         batch = dataset[index]
         print(batch)

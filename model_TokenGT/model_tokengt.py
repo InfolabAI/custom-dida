@@ -331,6 +331,7 @@ class TokenGTEncoder(FairseqEncoder):
             batched_data, perturb=perturb
         )
 
+        breakpoint()
         x = inner_states[-1].transpose(0, 1)  # B x T x C
 
         # project masked tokens only

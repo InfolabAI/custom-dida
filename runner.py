@@ -64,6 +64,7 @@ class Runner(object):
                 self.optimizer,
             )
         )
+        # test(args, self.x, self.data["train"])
         print("total length: {}, test length: {}".format(self.len, args.testlength))
 
     def run(self):

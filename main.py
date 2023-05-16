@@ -9,7 +9,6 @@ warnings.simplefilter("ignore")
 
 # load data
 args, data = load_data(args)
-test(args, data)
 
 # pre-logs
 log_dir = args.log_dir

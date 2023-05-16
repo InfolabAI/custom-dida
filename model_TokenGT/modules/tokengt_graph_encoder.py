@@ -285,9 +285,9 @@ class TokenGTGraphEncoder(nn.Module):
         if token_embeddings is not None:
             raise NotImplementedError
         else:
-            x, padding_mask, padded_index = self.graph_feature(batched_data, perturb)
-
-        breakpoint()
+            x, padding_mask, padded_index, padded_node_mask = self.graph_feature(
+                batched_data, perturb
+            )
 
         # x: B x T x C
 
@@ -326,6 +326,10 @@ class TokenGTGraphEncoder(nn.Module):
             if not last_state_only:
                 inner_states.append(x)
             attn_dict["maps"][i] = attn
+
+        breakpoint()
+        # restore node_features (i.e., batched_data['node_data'])
+        # x.transpose(0,1)[padded_node_mask, :]
 
         graph_rep = x[0, :, :]
 
