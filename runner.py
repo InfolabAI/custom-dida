@@ -64,6 +64,20 @@ class Runner(object):
                 self.optimizer,
             )
         )
+        self.model.tester.setRunnerProperty(
+            RunnerProperty(
+                self.args,
+                self.data,
+                self.writer,
+                self.len,
+                self.len_train,
+                self.len_val,
+                self.len_test,
+                self.loss,
+                self.x,
+                self.optimizer,
+            )
+        )
         # test(args, self.x, self.data["train"])
         print("total length: {}, test length: {}".format(self.len, args.testlength))
 
@@ -83,7 +97,7 @@ class Runner(object):
         #    )
 
         t_total0 = time.time()
-        max_auc = 0
+        max_val_auc = 0
         max_test_auc = 0
         max_train_auc = 0
 
@@ -103,12 +117,12 @@ class Runner(object):
                 average_test_auc = np.mean(test_auc_list)
 
                 # update the best results.
-                if average_val_auc > max_auc:
-                    max_auc = average_val_auc
+                if average_val_auc > max_val_auc:
+                    max_val_auc = average_val_auc
                     max_test_auc = average_test_auc
                     max_train_auc = average_train_auc
 
-                    test_results = self.test(epoch, self.data["test"])
+                    test_results = self.model.tester.test(epoch, self.data["train"])
 
                     metrics = "train_auc,val_auc,test_auc,epoch,test_train_auc,test_val_auc,test_test_auc".split(
                         ","
@@ -116,7 +130,7 @@ class Runner(object):
                     measure_dict = dict(
                         zip(
                             metrics,
-                            [max_train_auc, max_auc, max_test_auc] + test_results,
+                            [max_train_auc, max_val_auc, max_test_auc] + test_results,
                         )
                     )
 
@@ -126,25 +140,30 @@ class Runner(object):
                     patience += 1
                     if epoch > min_epoch and patience > max_patience:
                         break
-                if epoch == 1 or epoch % self.args.log_interval == 0:
-                    print(
-                        "Epoch:{}, Loss: {:.4f}, Time: {:.3f}".format(
-                            epoch, average_epoch_loss, time.time() - t0
-                        )
+                # if epoch == 1 or epoch % self.args.log_interval == 0:
+                print(
+                    "Epoch:{}, Loss: {:.4f}, Time: {:.3f}".format(
+                        epoch, average_epoch_loss, time.time() - t0
                     )
-                    print(
-                        f"Current: Epoch:{epoch}, Train AUC:{average_train_auc:.4f}, Val AUC: {average_val_auc:.4f}, Test AUC: {average_test_auc:.4f}"
-                    )
+                )
+                print(
+                    f"Current: Epoch:{epoch}, Train AUC:{average_train_auc:.4f}, Val AUC: {average_val_auc:.4f}, Test AUC: {average_test_auc:.4f}"
+                )
 
-                    print(
-                        f"Train: Epoch:{test_results[0]}, Train AUC:{max_train_auc:.4f}, Val AUC: {max_auc:.4f}, Test AUC: {max_test_auc:.4f}"
-                    )
-                    print(
-                        f"Test: Epoch:{test_results[0]}, Train AUC:{test_results[1]:.4f}, Val AUC: {test_results[2]:.4f}, Test AUC: {test_results[3]:.4f}"
-                    )
+                print(
+                    f"Train: Epoch:{test_results[0]}, Train AUC:{max_train_auc:.4f}, Val AUC: {max_val_auc:.4f}, Test AUC: {max_test_auc:.4f}"
+                )
+                print(
+                    f"Test: Epoch:{test_results[0]}, Train AUC:{test_results[1]:.4f}, Val AUC: {test_results[2]:.4f}, Test AUC: {test_results[3]:.4f}"
+                )
+                self.writer.add_scalar("Train AUC", test_results[1], epoch)
+                self.writer.add_scalar("Val AUC", test_results[2], epoch)
+                self.writer.add_scalar("Test AUC", test_results[3], epoch)
 
         epoch_time = (time.time() - t_total0) / (epoch - 1)
-        metrics = [max_train_auc, max_auc, max_test_auc] + test_results + [epoch_time]
+        metrics = (
+            [max_train_auc, max_val_auc, max_test_auc] + test_results + [epoch_time]
+        )
         metrics_des = "train_auc,val_auc,test_auc,epoch,test_train_auc,test_val_auc,test_test_auc,epoch_time".split(
             ","
         )
@@ -152,39 +171,3 @@ class Runner(object):
         df = pd.DataFrame([metrics], columns=metrics_des)
         print(df)
         return metrics_dict
-
-    def test(self, epoch, data):
-        args = self.args
-
-        train_auc_list = []
-
-        val_auc_list = []
-        test_auc_list = []
-        self.model.eval()
-        embeddings, cs, ss = self.model(
-            [
-                data["edge_index_list"][ix].long().to(args.device)
-                for ix in range(self.len)
-            ],
-            self.x,
-        )
-
-        for t in range(self.len - 1):
-            z = cs[t]
-            edge_index, pos_edge, neg_edge = prepare(data, t + 1)[:3]
-            if is_empty_edges(neg_edge):
-                continue
-            auc, ap = self.loss.predict(z, pos_edge, neg_edge, self.model.cs_decoder)
-            if t < self.len_train - 1:
-                train_auc_list.append(auc)
-            elif t < self.len_train + self.len_val - 1:
-                val_auc_list.append(auc)
-            else:
-                test_auc_list.append(auc)
-
-        return [
-            epoch,
-            np.mean(train_auc_list),
-            np.mean(val_auc_list),
-            np.mean(test_auc_list),
-        ]

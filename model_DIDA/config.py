@@ -9,6 +9,7 @@ parser.add_argument("--num_nodes", type=int, default=-1, help="num of nodes")
 parser.add_argument("--nfeat", type=int, default=128, help="dim of input feature")
 
 # 2.experiments
+parser.add_argument("--model_h", type=str, help="tokengt | dida")
 parser.add_argument(
     "--max_epoch", type=int, default=1000, help="number of epochs to train."
 )
@@ -53,7 +54,7 @@ parser.add_argument(
 parser.add_argument("--learns", type=int, default=1)
 parser.add_argument("--warm_epoch", type=int, default=0)
 parser.add_argument("--use_cfg", type=int, default=1)
-parser.add_argument("--log_interval", type=int, default=20, help="")
+parser.add_argument("--log_interval", type=int, default=2, help="")
 
 args = parser.parse_args()
 

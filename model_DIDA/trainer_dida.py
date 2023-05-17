@@ -27,7 +27,6 @@ class Trainer_DIDA(Trainer):
         # A: cs is a list of tensors, each of which is a 2xN tensor
         # Q: what is difference between cs and ss?
         # A: cs is the output of the causal decoder, ss is the output of the spatial decoder
-        breakpoint()
         embeddings, cs, ss = self.model(
             [
                 data["edge_index_list"][ix].long().to(args.device)

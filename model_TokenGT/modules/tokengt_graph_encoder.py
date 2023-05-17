@@ -13,6 +13,7 @@ from .performer_pytorch import ProjectionUpdater
 from .multihead_attention import MultiheadAttention
 from .tokenizer import GraphFeatureTokenizer
 from .tokengt_graph_encoder_layer import TokenGTGraphEncoderLayer
+from ..dataset_handler_tokengt import DatasetConverter
 
 
 def init_graphormer_params(module):
@@ -327,16 +328,8 @@ class TokenGTGraphEncoder(nn.Module):
                 inner_states.append(x)
             attn_dict["maps"][i] = attn
 
-        breakpoint()
         # restore node_features (i.e., batched_data['node_data'])
-        # x.transpose(0,1)[padded_node_mask, :]
-
-        graph_rep = x[0, :, :]
-
-        if last_state_only:
-            inner_states = [x]
-
-        if self.traceable:
-            return torch.stack(inner_states), graph_rep, attn_dict
-        else:
-            return inner_states, graph_rep, attn_dict
+        node_data_at_time_t = x.transpose(0, 1)[padded_node_mask, :]
+        return DatasetConverter(
+            node_data_at_time_t, batched_data["cur_x_to_node_data_mapping_dict"]
+        )

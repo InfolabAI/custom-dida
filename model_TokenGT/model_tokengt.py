@@ -25,6 +25,26 @@ logger = logging.getLogger(__name__)
 
 from .pretrain_for_ref import load_pretrained_model
 from model_TokenGT.trainer_tokengt import Trainer_TokenGT
+from model_TokenGT.tester_tokengt import Tester_TokenGT
+
+
+def tokengt_zhang_2022(args):
+    args.encoder_embed_dim = 32
+    args.encoder_ffn_embed_dim = 32
+    args.encoder_layers = 6
+    args.encoder_attention_heads = 16
+
+
+class MultiplyPredictor(torch.nn.Module):
+    def __init__(self):
+        super(MultiplyPredictor, self).__init__()
+        # self.dum=Parameter(torch.ones(1), requires_grad=True)
+
+    def forward(self, z, e):
+        x_i = z[e[0]]
+        x_j = z[e[1]]
+        x = (x_i * x_j).sum(dim=1)
+        return torch.sigmoid(x)
 
 
 @register_model("tokengt")
@@ -34,6 +54,8 @@ class TokenGTModel(FairseqEncoderModel):
         self.args = args
         self.args.tokengt_model = self
         self.trainer = Trainer_TokenGT(args, self)
+        self.tester = Tester_TokenGT(args, self)
+        self.cs_decoder = MultiplyPredictor()
 
         if getattr(args, "apply_graphormer_init", False):
             self.apply(init_graphormer_params)
@@ -215,7 +237,7 @@ class TokenGTModel(FairseqEncoderModel):
         from argparse import ArgumentParser
 
         parser = ArgumentParser()
-        tokengt_args = parser.parse_args()
+        tokengt_args = parser.parse_args([])
         tokengt_args.__dict__ = json.load(
             open("./model_TokenGT/argparse.json", "r")
         )  ## argparse.json is from args at https://github.com/InfolabAI/tokengt_custom/blob/7e9f7c994fc7ba3247eec0f8442e064747cee42d/large-scale-regression/tokengt/models/tokengt.py#L217
@@ -227,9 +249,12 @@ class TokenGTModel(FairseqEncoderModel):
         logger.info(tokengt_args)
 
         encoder = TokenGTEncoder(tokengt_args)
+        cls.tokengt_args = tokengt_args
+
         return cls(tokengt_args, encoder)
 
     def forward(self, batched_data, **kwargs):
+        # stem - nn.Linear(32, 16).to(batched_data['node_data'].device)(batched_data['node_data']).shape
         return self.encoder(batched_data, **kwargs)
 
 
@@ -327,33 +352,7 @@ class TokenGTEncoder(FairseqEncoder):
     # Q: what is batched_data?
     # A: batched_data is a dictionary of tensors
     def forward(self, batched_data, perturb=None, masked_tokens=None, **unused):
-        inner_states, graph_rep, attn_dict = self.graph_encoder(
-            batched_data, perturb=perturb
-        )
-
-        breakpoint()
-        x = inner_states[-1].transpose(0, 1)  # B x T x C
-
-        # project masked tokens only
-        if masked_tokens is not None:
-            raise NotImplementedError
-
-        x = self.layer_norm(self.activation_fn(self.lm_head_transform_weight(x)))
-
-        # project back to size of vocabulary
-        if self.share_input_output_embed and hasattr(
-            self.graph_encoder.embed_tokens, "weight"
-        ):
-            x = F.linear(x, self.graph_encoder.embed_tokens.weight)
-        elif self.embed_out is not None:
-            x = self.embed_out(x)
-        if self.lm_output_learned_bias is not None:
-            x = x + self.lm_output_learned_bias
-
-        if self.return_attention:
-            return x[:, 0, :], attn_dict
-        else:
-            return x[:, 0, :]
+        return self.graph_encoder(batched_data, perturb=perturb)
 
     def performer_finetune_setup(self):
         self.graph_encoder.performer_finetune_setup()
@@ -411,11 +410,6 @@ def base_architecture(args):
     )
 
     args.return_attention = getattr(args, "return_attention", False)
-
-
-def tokengt_zhang_2022(args):
-    args.encoder_embed_dim = 32
-    args.encoder_ffn_embed_dim = 32
 
 
 @register_model_architecture("tokengt", "tokengt_base")

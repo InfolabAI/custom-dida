@@ -48,6 +48,16 @@ class EnvLoss(nn.Module):
     def predict(self, z, pos_edge_index, neg_edge_index, decoder):
         pos_y = z.new_ones(pos_edge_index.size(1)).to(device)
         neg_y = z.new_zeros(neg_edge_index.size(1)).to(device)
+        """
+        (Pdb) p pos_y
+            tensor([1., 1., 1.,  ..., 1., 1., 1.], device='cuda:0')
+        (Pdb) p pos_y.shape
+            torch.Size([2254])
+        (Pdb) p pos_edge_index.shape
+            torch.Size([2, 2254])
+        (Pdb) p z.shape
+            torch.Size([23035, 16])
+        """
         y = torch.cat([pos_y, neg_y], dim=0)
         pos_pred = decoder(z, pos_edge_index)
         neg_pred = decoder(z, neg_edge_index)

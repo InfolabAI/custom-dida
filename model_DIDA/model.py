@@ -4,6 +4,7 @@ from torch.nn import Parameter
 from torch_geometric.utils import softmax
 from torch_scatter import scatter
 from model_DIDA.trainer_dida import Trainer_DIDA
+from model_DIDA.tester_dida import Tester_DIDA
 import torch.nn.functional as F
 import torch
 import math
@@ -251,6 +252,7 @@ class DGNN(nn.Module):
     def __init__(self, args=None):
         super(DGNN, self).__init__()
         self.trainer = Trainer_DIDA(args, self)
+        self.tester = Tester_DIDA(args, self)
         self.args = args
 
         n_layers = args.n_layers
@@ -293,7 +295,6 @@ class DGNN(nn.Module):
         glorot(self.feat)
 
     def forward(self, edge_index_list, x_list):
-        breakpoint()
         if x_list is None:
             x_list = [self.linear(self.feat) for i in range(len(edge_index_list))]
         else:
