@@ -39,19 +39,15 @@ class Trainer_TokenGT(Trainer):
             print(f"t = {t}")
             # pbar.set_description(f"Processing item {t}")
 
-            st = time.process_time()
             batch = data[t]
-            print("get batch", time.process_time() - st)
-            st = time.process_time()
             z = self.model(batch)
             # catch nan and inf
             # TODO ANKI [OBNOTE: ] - catch nan or inf
-            if torch.isnan(z.node_data).any() or torch.isinf(z.node_data).any():
-                print("   nan or inf")
-                breakpoint()
-                # TODO END ANKI
+            # if torch.isnan(z.node_data).any() or torch.isinf(z.node_data).any():
+            #    print("   nan or inf")
+            #    breakpoint()
+            # TODO END ANKI
 
-            print("model", time.process_time() - st)
             pos_edge_index = prepare(data.data, t + 1)[0]
             if args.dataset == "yelp":
                 neg_edge_index = bi_negative_sampling(
@@ -70,52 +66,25 @@ class Trainer_TokenGT(Trainer):
             criterion = torch.nn.BCELoss()
 
             def cal_loss(y, label):
-                print(
-                    f"y.mean() = {float(y.detach().mean().cpu().numpy()):.2f}, max()={float(y.detach().max().cpu().numpy()):.2f}, min()={float(y.detach().min().cpu().numpy()):.2f}"
-                )
                 return criterion(y, label)
 
-            st = time.process_time()
             cy = self.model.cs_decoder(z, edge_index)
-            print("decoder", time.process_time() - st)
 
             loss = cal_loss(cy, edge_label)
 
             st = time.process_time()
             optimizer.zero_grad()
             loss.backward()
-            print(
-                f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>loss {loss.detach().item():.4f}"
-            )
-            print(f"   params {list(self.model.parameters())[5].detach().mean()}")
-            print(f"   grad {list(self.model.parameters())[5].grad.detach().mean()}")
-            if (
-                torch.isnan(list(self.model.parameters())[5].grad).any()
-                or torch.isinf(list(self.model.parameters())[5].grad).any()
-            ):
-                print("   nan or inf")
-                grad_fn = loss.grad_fn
-                while grad_fn is not None:
-                    print(grad_fn)
-                    grad_fn = (
-                        grad_fn.next_functions[0][0] if grad_fn.next_functions else None
-                    )
-                breakpoint()
+            # TODO ANKI [OBNOTE: ] - grad_fn 을 따라 올라가면서 연산과정을 확인하는 방법
+            # grad_fn = loss.grad_fn
+            # while grad_fn is not None:
+            #    print(grad_fn)
+            #    grad_fn = (
+            #        grad_fn.next_functions[0][0] if grad_fn.next_functions else None
+            #    )
+            # TODO END ANKI
             # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
             optimizer.step()
-            print(
-                f"   params after step {list(self.model.parameters())[5].detach().mean()}"
-            )
-            print(
-                f"   grad after step {list(self.model.parameters())[5].grad.detach().mean()}"
-            )
-            if (
-                torch.isnan(list(self.model.parameters())[5]).any()
-                or torch.isinf(list(self.model.parameters())[5]).any()
-            ):
-                print("   nan or inf")
-                breakpoint()
-            print("backpropagation", time.process_time() - st)
             epoch_losses.append(loss.detach().item())
             # pbar.set_postfix(loss=f"{loss.detach().item():.4f}")
             # pbar.update(1)
