@@ -31,8 +31,9 @@ from model_TokenGT.tester_tokengt import Tester_TokenGT
 def tokengt_zhang_2022(args):
     args.encoder_embed_dim = 32
     args.encoder_ffn_embed_dim = 32
-    args.encoder_layers = 6
-    args.encoder_attention_heads = 16
+    args.encoder_layers = 3
+    args.encoder_attention_heads = 4
+    args.activation_fn = "relu"
 
 
 class MultiplyPredictor(torch.nn.Module):
@@ -49,23 +50,26 @@ class MultiplyPredictor(torch.nn.Module):
 
 @register_model("tokengt")
 class TokenGTModel(FairseqEncoderModel):
-    def __init__(self, args, encoder):
+    def __init__(self, dida_args, tokengt_args, encoder):
         super().__init__(encoder)
-        self.args = args
-        self.args.tokengt_model = self
-        self.trainer = Trainer_TokenGT(args, self)
-        self.tester = Tester_TokenGT(args, self)
+        self.tokengt_args = tokengt_args
+        self.args = dida_args
+        self.tokengt_args.tokengt_model = self
+        self.trainer = Trainer_TokenGT(dida_args, self)
+        self.tester = Tester_TokenGT(dida_args, self)
         self.cs_decoder = MultiplyPredictor()
 
-        if getattr(args, "apply_graphormer_init", False):
+        if getattr(tokengt_args, "apply_graphormer_init", False):
             self.apply(init_graphormer_params)
-        self.encoder_embed_dim = args.encoder_embed_dim
-        if args.pretrained_model_name != "none":
-            self.load_state_dict(load_pretrained_model(args.pretrained_model_name))
-            if not args.load_pretrained_model_output_layer:
+        self.encoder_embed_dim = tokengt_args.encoder_embed_dim
+        if tokengt_args.pretrained_model_name != "none":
+            self.load_state_dict(
+                load_pretrained_model(tokengt_args.pretrained_model_name)
+            )
+            if not tokengt_args.load_pretrained_model_output_layer:
                 self.encoder.reset_output_layer_parameters()
 
-        if args.performer_finetune:
+        if tokengt_args.performer_finetune:
             self.encoder.performer_finetune_setup()
 
     @staticmethod
@@ -229,7 +233,7 @@ class TokenGTModel(FairseqEncoderModel):
         return self.encoder.max_nodes
 
     @classmethod
-    def build_model(cls, task=None):
+    def build_model(cls, args):
         """Build a new model instance."""
         # make sure all arguments are present in older models
         # base_architecture(args)
@@ -249,9 +253,8 @@ class TokenGTModel(FairseqEncoderModel):
         logger.info(tokengt_args)
 
         encoder = TokenGTEncoder(tokengt_args)
-        cls.tokengt_args = tokengt_args
 
-        return cls(tokengt_args, encoder)
+        return cls(args, tokengt_args, encoder)
 
     def forward(self, batched_data, **kwargs):
         # stem - nn.Linear(32, 16).to(batched_data['node_data'].device)(batched_data['node_data']).shape

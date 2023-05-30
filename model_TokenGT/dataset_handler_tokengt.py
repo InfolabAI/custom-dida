@@ -1,3 +1,4 @@
+from typing import Any
 import torch
 import numpy as np
 from collections import defaultdict
@@ -9,33 +10,47 @@ class DatasetConverter:
         Args:
             x (tensor): node_data after tokengt. the node features with dimension [#sum of nodes of graphs, dim of a node feature]
             mapping_dict (dict): the mapping from cur_x to node_data
+            max_node_idx (int): the maximum node index of the original graph
 
         """
         self.node_data = node_data
         self.device = node_data.device
         self.mapping_dict = mapping_dict
+        original_node_indices = np.array(list(self.mapping_dict.keys()))
+        original_node_indices.sort()
+        self.max_node_idx = original_node_indices[-1]
+        self.node_data = self.convert_to_original()
 
     def getitem_an_index(self, idx):
         gathered_x = self.node_data[self.mapping_dict[idx]]
-        return gathered_x.mean(0, keepdim=True)
+        return gathered_x.sum(0, keepdim=True)
+
+    def convert_to_original(self):
+        tensor_list = []
+        for i in range(self.max_node_idx + 1):
+            tensor_list += [self.getitem_an_index(i)]
+        return torch.cat(tensor_list, dim=0)
 
     def __getitem__(self, idx):
-        if isinstance(idx, int):
-            self.getitem_an_index(idx)
-        else:
-            tensor_list = []
-            for el in idx:
-                if isinstance(el, int):  # 이미 int인 경우 그대로 반환
-                    pass
-                elif isinstance(el, np.ndarray):  # NumPy 배열인 경우 int로 변환하여 반환
-                    el = int(el)
-                elif isinstance(el, torch.Tensor):  # PyTorch Tensor인 경우 int로 변환하여 반환
-                    el = int(el.cpu().numpy())
-                else:  # 지원하지 않는 타입인 경우 예외 처리
-                    raise NotImplementedError
+        return self.node_data[idx]
 
-                tensor_list += [self.getitem_an_index(el)]
-            return torch.concat(tensor_list, dim=0)
+    # def __getitem__(self, idx):
+    #    if isinstance(idx, int):
+    #        self.getitem_an_index(idx)
+    #    else:
+    #        tensor_list = []
+    #        for el in idx:
+    #            if isinstance(el, int):  # 이미 int인 경우 그대로 반환
+    #                pass
+    #            elif isinstance(el, np.ndarray):  # NumPy 배열인 경우 int로 변환하여 반환
+    #                el = int(el)
+    #            elif isinstance(el, torch.Tensor):  # PyTorch Tensor인 경우 int로 변환하여 반환
+    #                el = int(el.cpu().numpy())
+    #            else:  # 지원하지 않는 타입인 경우 예외 처리
+    #                raise NotImplementedError
+
+    #            tensor_list += [self.getitem_an_index(el)]
+    #        return torch.concat(tensor_list, dim=0)
 
     def detach(self):
         self.node_data = self.node_data.detach()
@@ -65,6 +80,13 @@ class TokenGTDataset(torch.utils.data.Dataset):
         self.device = device
         self.sample_num_edge = 50  # sample number of subedges at once
         self.sample_num_node_with_no_edge = 100
+        self.max_time = len(self.data["pedges"])
+        self.convert_all()
+
+    def convert_all(self):
+        self.converted_data_list = []
+        for t in range(self.max_time):
+            self.converted_data_list += [self.convert_to_tokengt_input(t)]
 
     def sample_subedges(self, cur_edges, cur_edge_data):
         """
@@ -79,8 +101,12 @@ class TokenGTDataset(torch.utils.data.Dataset):
             pool_edges = np.setdiff1d(pool_edges, subedges)
             yield cur_edges[:, subedges], cur_edge_data[subedges]
 
-        # yield the remaining subedges
-        yield cur_edges[:, pool_edges], cur_edge_data[pool_edges]
+        # TODO ANKI [OBNOTE: ] - # pool_edges 의 길이가 sameple_num_edge 로 정확히 나누어 떨어지면 pool_edges 길이가 0일 수 있으므로 예외처리
+        if pool_edges.shape[0] != 0:
+            # pool_edges 의 길이가 sameple_num_edge 로 정확히 나누어 떨어지면 pool_edges 길이가 0일 수 있으므로 예외처리
+            # yield the remaining subedges
+            yield cur_edges[:, pool_edges], cur_edge_data[pool_edges]
+            # TODO END ANKI
 
     def generate_subgraphs_with_edges(self, cur_edges, cur_edge_data, cur_x):
         # generate subgraphs
@@ -153,9 +179,13 @@ class TokenGTDataset(torch.utils.data.Dataset):
             total_indices_subnodes_with_edges,
         )  # represent one example in torch.utils.data.DataLoader
 
+    # TODO ANKI [OBNOTE: ] -
     def generate_subgraphs_with_no_edges(
         self, cur_x, total_indices_subnodes_with_edges
     ):
+        # To caluculate the loss, we need all the nodes including nodes with no edges.
+        # TODO END ANKI
+
         indices_nodes_with_no_edge = np.setdiff1d(
             np.arange(cur_x.shape[0]), total_indices_subnodes_with_edges
         )
@@ -281,8 +311,11 @@ class TokenGTDataset(torch.utils.data.Dataset):
         return self.x.shape[1]
 
     def __getitem__(self, time_t):
-        a_graph_at_a_time = self.convert_to_tokengt_input(time_t)
-        return a_graph_at_a_time
+        # complete checking shuffled data
+        # print(
+        #    f'edge means: {self.converted_data_list[time_t]["edge_index"].to(float).mean().cpu().numpy()}'
+        # )
+        return self.converted_data_list[time_t]
 
     def __len__(self):
         num_time_stamps = len(self.data["pedges"])

@@ -11,6 +11,7 @@ class Trainer_DIDA(Trainer):
         pass
 
     def train(self, epoch, data):
+        super().train(data)
         if self.runnerProperty == None:
             raise Exception("You need to set setRunnerProperty first.")
 

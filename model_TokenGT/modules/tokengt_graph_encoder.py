@@ -14,6 +14,7 @@ from .multihead_attention import MultiheadAttention
 from .tokenizer import GraphFeatureTokenizer
 from .tokengt_graph_encoder_layer import TokenGTGraphEncoderLayer
 from ..dataset_handler_tokengt import DatasetConverter
+from hook import gradient_hook_for_tensor
 
 
 def init_graphormer_params(module):
@@ -328,6 +329,9 @@ class TokenGTGraphEncoder(nn.Module):
                 inner_states.append(x)
             attn_dict["maps"][i] = attn
 
+        # TODO ANKI [OBNOTE: ] - tensor hook 설정
+        # x.register_hook(gradient_hook_for_tensor)
+        # TODO END ANKI
         # restore node_features (i.e., batched_data['node_data'])
         node_data_at_time_t = x.transpose(0, 1)[padded_node_mask, :]
         return DatasetConverter(

@@ -347,10 +347,12 @@ class GraphFeatureTokenizer(nn.Module):
         #    padded_feature, padding_mask
         # )  # [B, 2+T, D], [B, 2+T]
 
+        # TODO ANKI [OBNOTE: ] - this padding_mask being sent to the multihaed attention layer is causing the nan output from softmax in  multihead attention layer
         padded_feature = padded_feature.masked_fill(padding_mask[..., None], float("0"))
+        # TODO END ANKI
         return (
             padded_feature,
             padding_mask,
             padded_index,
-            padded_node_mask
+            padded_node_mask,
         )  # [B, 2+T, D], [B, 2+T], [B, T, 2]

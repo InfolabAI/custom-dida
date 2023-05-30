@@ -7,8 +7,27 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", type=str, default="collab", help="datasets")
 parser.add_argument("--num_nodes", type=int, default=-1, help="num of nodes")
 parser.add_argument("--nfeat", type=int, default=128, help="dim of input feature")
+# TODO ANKI [OBNOTE: data shuffle] - add args
+parser.add_argument(
+    "--shuffled",
+    type=int,
+    default=0,
+    help="if this option is 1, the time stamps are shuffled",
+)
+# TODO END ANKI
+# TODO ANKI [OBNOTE: plot] - add args for plot
+parser.add_argument(
+    "--plot",
+    type=int,
+    default=0,
+    help="if this option is 1, the stats of datasets are plotted",
+)
+# TODO END ANKI
 
 # 2.experiments
+parser.add_argument(
+    "--is_debug", type=int, default=1, help="to devide log folder when debugging or nor"
+)
 parser.add_argument("--model_h", type=str, help="tokengt | dida")
 parser.add_argument(
     "--max_epoch", type=int, default=1000, help="number of epochs to train."
@@ -30,7 +49,7 @@ parser.add_argument(
     "--sampling_times", type=int, default=1, help="negative sampling times"
 )
 parser.add_argument("--min_epoch", type=int, default=200, help="min epoch")
-parser.add_argument("--log_dir", type=str, default="logs/tmp/")
+parser.add_argument("--log_dir", type=str, default="logs/performance/")
 parser.add_argument("--nhid", type=int, default=8, help="dim of hidden embedding")  # 8
 parser.add_argument("--n_layers", type=int, default=2)
 parser.add_argument("--heads", type=int, default=4, help="attention heads.")  # 4

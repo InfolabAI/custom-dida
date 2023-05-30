@@ -18,31 +18,41 @@ class Tester_TokenGT(Trainer):
         args = self.runnerProperty.args
         self.model.eval()
 
-        dataset = TokenGTDataset(self.runnerProperty.x, data, args.device)
         with torch.no_grad():
             cs = []
-            for index in tqdm(range(len(dataset))):
-                batch = dataset[index]
-                cs += [self.model(batch)]
+            with tqdm(total=len(data)) as pbar:
+                pbar.set_description(f"Processing batch")
+                for index in range(len(data)):
+                    batch = data[index]
+                    cs += [self.model(batch)]
+                    # pbar next step
+                    pbar.update(1)
 
             # test
             val_auc_list = []
             test_auc_list = []
             train_auc_list = []
-            for t in tqdm(range(self.runnerProperty.len - 1)):
-                z = cs[t]
-                _, pos_edge, neg_edge = prepare(data, t + 1)[:3]
-                auc, ap = self.runnerProperty.loss.predict(
-                    z, pos_edge, neg_edge, self.model.cs_decoder
-                )
-                if t < self.runnerProperty.len_train - 1:
-                    train_auc_list.append(auc)
-                elif (
-                    t < self.runnerProperty.len_train + self.runnerProperty.len_val - 1
-                ):
-                    val_auc_list.append(auc)
-                else:
-                    test_auc_list.append(auc)
+            with tqdm(total=self.runnerProperty.len - 1) as pbar:
+                pbar.set_description("Test")
+                for t in range(self.runnerProperty.len - 1):
+                    z = cs[t]
+                    _, pos_edge, neg_edge = prepare(data.data, t + 1)[:3]
+                    auc, ap = self.runnerProperty.loss.predict(
+                        z, pos_edge, neg_edge, self.model.cs_decoder
+                    )
+                    if t < self.runnerProperty.len_train - 1:
+                        train_auc_list.append(auc)
+                    elif (
+                        t
+                        < self.runnerProperty.len_train
+                        + self.runnerProperty.len_val
+                        - 1
+                    ):
+                        val_auc_list.append(auc)
+                    else:
+                        test_auc_list.append(auc)
+
+                    pbar.update(1)
 
         return [
             epoch,
