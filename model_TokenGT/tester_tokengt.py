@@ -4,6 +4,7 @@ from torch_geometric.utils import negative_sampling
 from model_DIDA.utils.mutils import *
 from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
 from tqdm import tqdm
+from plot_based_on_hub_nodes import PlotBasedOnHubNodes
 
 
 class Tester_TokenGT(Trainer):
@@ -12,6 +13,15 @@ class Tester_TokenGT(Trainer):
         pass
 
     def test(self, epoch, data):
+        # plot init
+        plot_ = PlotBasedOnHubNodes(
+            self.args,
+            data.data,
+            self.model.cs_decoder,
+            self.runnerProperty.writer,
+            epoch,
+        )
+
         if self.runnerProperty == None:
             raise Exception("You need to set setRunnerProperty first.")
 
@@ -53,7 +63,9 @@ class Tester_TokenGT(Trainer):
                         test_auc_list.append(auc)
 
                     pbar.update(1)
+                    plot_.process_t(z, t)
 
+        plot_.process_epoch(epoch)
         return [
             epoch,
             np.mean(train_auc_list),

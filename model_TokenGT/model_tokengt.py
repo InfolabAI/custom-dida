@@ -31,9 +31,9 @@ from model_TokenGT.tester_tokengt import Tester_TokenGT
 def tokengt_zhang_2022(args):
     args.encoder_embed_dim = 32
     args.encoder_ffn_embed_dim = 32
-    args.encoder_layers = 3
-    args.encoder_attention_heads = 4
-    args.activation_fn = "relu"
+    args.encoder_layers = 2
+    args.encoder_attention_heads = 2
+    # args.activation_fn = "relu"
 
 
 class MultiplyPredictor(torch.nn.Module):

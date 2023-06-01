@@ -52,9 +52,11 @@ def select_by_venue(edges, venues=[0, 1]):
     return edges
 
 
-def load_data(args):
+def load_data(args, dataset=None):
     seed_everything(0)
-    dataset = args.dataset
+    if dataset is None:
+        dataset = args.dataset
+
     if dataset == "collab":
         from ..data_configs.collab import (
             testlength,
@@ -120,6 +122,43 @@ def load_data(args):
         args.nfeat = data["x"][0].shape[1]
         args.num_nodes = len(data["x"][0])
         args.length = len(data["x"])
+
+    elif "bitcoin" == dataset:
+        from preprocess_dict_from_dgl import PreprocessDictFromDGL
+
+        data = PreprocessDictFromDGL(
+            "raw_data/BitcoinAlpha", "data/BitcoinAlpha"
+        ).graph_dict
+        args.dataset = dataset
+        args.length = len(data["train"]["pedges"])
+        args.vallength = 1
+        args.testlength = int(args.length * 0.2)
+        args.nfeat = data["x"].shape[1]
+        args.num_nodes = len(data["x"])
+
+    elif "redditbody" == dataset:
+        from preprocess_dict_from_dgl import PreprocessDictFromDGL
+
+        data = PreprocessDictFromDGL(
+            "raw_data/RedditBody", "data/RedditBody"
+        ).graph_dict
+        args.dataset = dataset
+        args.length = len(data["train"]["pedges"])
+        args.vallength = 1
+        args.testlength = int(args.length * 0.2)
+        args.nfeat = data["x"].shape[1]
+        args.num_nodes = len(data["x"])
+
+    elif "wikielec" == dataset:
+        from preprocess_dict_from_dgl import PreprocessDictFromDGL
+
+        data = PreprocessDictFromDGL("raw_data/WikiElec", "data/WikiElec").graph_dict
+        args.dataset = dataset
+        args.length = len(data["train"]["pedges"])
+        args.vallength = 1
+        args.testlength = int(args.length * 0.2)
+        args.nfeat = data["x"].shape[1]
+        args.num_nodes = len(data["x"])
     else:
         raise NotImplementedError(f"Unknown dataset {dataset}")
     print(f"Loading dataset {dataset}")

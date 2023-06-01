@@ -24,11 +24,16 @@ parser.add_argument(
 )
 # TODO END ANKI
 
-# 2.experiments
+# 2-0.plot
 parser.add_argument(
-    "--is_debug", type=int, default=1, help="to devide log folder when debugging or nor"
+    "--plot_hub_nodes",
+    type=int,
+    default=0,
+    help="if this option is 1, the stats based on hub nodes are plotted",
 )
-parser.add_argument("--model_h", type=str, help="tokengt | dida")
+
+# 2.experiments
+parser.add_argument("--model", type=str, help="tokengt | dida")
 parser.add_argument(
     "--max_epoch", type=int, default=1000, help="number of epochs to train."
 )
@@ -49,7 +54,8 @@ parser.add_argument(
     "--sampling_times", type=int, default=1, help="negative sampling times"
 )
 parser.add_argument("--min_epoch", type=int, default=200, help="min epoch")
-parser.add_argument("--log_dir", type=str, default="logs/performance/")
+parser.add_argument("--log_dir", type=str, default="logs/tmp/")
+parser.add_argument("--ex_name", type=str, default="test")
 parser.add_argument("--nhid", type=int, default=8, help="dim of hidden embedding")  # 8
 parser.add_argument("--n_layers", type=int, default=2)
 parser.add_argument("--heads", type=int, default=4, help="attention heads.")  # 4
@@ -135,4 +141,17 @@ if args.use_cfg:
         }
         setargs(args, hp)
     else:
-        raise NotImplementedError(f"dataset {args.dataset} not implemented")
+        hp = {
+            "n_layers": 2,
+            "heads": 4,
+            "norm": 1,
+            "skip": 0,
+            "dropout": 0.0,
+            "use_RTE": 1,
+            "n_intervene": 1000,
+            "la_intervene": 0.01,
+            "fmask": 1,
+            "lin_bias": 0,
+        }
+        setargs(args, hp)
+        # raise NotImplementedError(f"dataset {args.dataset} not implemented")

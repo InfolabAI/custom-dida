@@ -11,6 +11,7 @@ HISTOGRAMS_DIR = "./logs/histograms/"
 
 
 class VisualizeEdges:
+    # TODO ANKI [OBNOTE: ] - 
     def build_edgedict_from_dynamic_graph(
         self, dynamic_graph_edges: torch.Tensor
     ) -> dict:
@@ -34,6 +35,7 @@ class VisualizeEdges:
                     # directed graph 라서 여기서 += 를 쓰면 2인 경우도 있음
                     edgedict[f"{edge[0]}-{edge[1]}"][t] += 1
         return edgedict
+        # TODO END ANKI
 
     def visualize_edges(self, name, edgedict: dict):
         self._visualize_edges_for_each_timestep_matplotlib(name, edgedict)

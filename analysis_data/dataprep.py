@@ -7,7 +7,7 @@ from model_DIDA.utils.data_util import *
 # create function to load data and to input dataprep
 def dataprep():
     # load data
-    from model_DIDA.config import args
+    from config import args
 
     args, data = load_data(args)
     # use dataprep for numpy array from data

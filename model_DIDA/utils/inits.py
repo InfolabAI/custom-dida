@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import torch
-from model_DIDA.config import args
+from config import args
 
 
 def uniform(size, tensor):

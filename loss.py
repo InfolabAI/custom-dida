@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn.metrics import roc_auc_score, average_precision_score
-from model_DIDA.config import args
+from sklearn.metrics import roc_auc_score, average_precision_score, accuracy_score
+from config import args
 from torch_geometric.utils import negative_sampling
 from model_DIDA.utils.util import logger
 from model_DIDA.utils.mutils import *

@@ -11,7 +11,7 @@ class Trainer:
 
     # TODO ANKI [OBNOTE: ] - shuffle and preprocess data
     def preprocess_data_per_ex(self, x, data):
-        if self.args.model_h == "tokengt":
+        if self.args.model == "tokengt":
             data_ = TokenGTDataset(x, data, self.args.device)
         else:
             data_ = data
@@ -21,10 +21,10 @@ class Trainer:
 
     def preprocess_data_per_epoch(self, data):
         if self.args.shuffled:
-            if self.args.model_h == "dida":
+            if self.args.model == "dida":
                 for key in data.keys():
                     data[key] = self.shuffle(data[key], key=key)
-            elif self.args.model_h == "tokengt":
+            elif self.args.model == "tokengt":
                 data.converted_data_list = self.shuffle(
                     data.converted_data_list, key="tokengt"
                 )

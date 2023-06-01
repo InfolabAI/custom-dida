@@ -11,7 +11,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
 from model_DIDA.utils.inits import prepare
-from model_DIDA.utils.loss import EnvLoss
+from loss import EnvLoss
 from tqdm import tqdm
 import pandas as pd
 
