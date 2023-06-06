@@ -9,8 +9,15 @@
 #python main.py --model dida --device_id 4 --dataset bitcoin --plot_hub_nodes 1 --ex_name "Plot based on hub nodes" &
 #python main.py --model dida --device_id 2 --dataset wikielec --plot_hub_nodes 1 --ex_name "Plot based on hub nodes" &
 
-python main.py --model tokengt --device_id 3 --dataset bitcoin --shuffled 1 --ex_name "Comparison based on the shuffle option" &
-python main.py --model tokengt --device_id 1 --dataset redditbody --shuffled 1 --ex_name "Comparison based on the shuffle option" &
-python main.py --model tokengt --device_id 2 --dataset wikielec --shuffled 1 --ex_name "Comparison based on the shuffle option" &
-python main.py --model dida --device_id 4 --dataset bitcoin --shuffled 1 --ex_name "Comparison based on the shuffle option" &
-python main.py --model dida --device_id 2 --dataset wikielec --shuffled 1 --ex_name "Comparison based on the shuffle option" &
+#python main.py --model tokengt --device_id 3 --dataset bitcoin --shuffled 1 --ex_name "Comparison based on the shuffle option" &
+#python main.py --model tokengt --device_id 1 --dataset redditbody --shuffled 1 --ex_name "Comparison based on the shuffle option" &
+#python main.py --model tokengt --device_id 2 --dataset wikielec --shuffled 1 --ex_name "Comparison based on the shuffle option" &
+#python main.py --model dida --device_id 4 --dataset bitcoin --shuffled 1 --ex_name "Comparison based on the shuffle option" &
+#python main.py --model dida --device_id 2 --dataset wikielec --shuffled 1 --ex_name "Comparison based on the shuffle option" &
+
+
+python main.py --dataset wikielec --draw_community_detection 1 &
+python main.py --dataset bitcoin --draw_community_detection 1 &
+python main.py --dataset redditbody --draw_community_detection 1 &
+python main.py --dataset collab --draw_community_detection 1 &
+python main.py --dataset yelp --draw_community_detection 1 &

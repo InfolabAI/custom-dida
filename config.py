@@ -31,6 +31,12 @@ parser.add_argument(
     default=0,
     help="if this option is 1, the stats based on hub nodes are plotted",
 )
+parser.add_argument(
+    "--draw_community_detection",
+    type=int,
+    default=0,
+    help="if this option is 1, the graphs based on community detection are drawed",
+)
 
 # 2.experiments
 parser.add_argument("--model", type=str, help="tokengt | dida")
