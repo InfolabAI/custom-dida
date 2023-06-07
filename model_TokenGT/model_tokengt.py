@@ -3,6 +3,7 @@ Modified from https://github.com/microsoft/Graphormer
 """
 
 import logging
+import time
 
 import torch
 import torch.nn as nn
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 from .pretrain_for_ref import load_pretrained_model
 from model_TokenGT.trainer_tokengt import Trainer_TokenGT
 from model_TokenGT.tester_tokengt import Tester_TokenGT
+from model_TokenGT.dataset_handler_get import get_data_converter
 
 
 def tokengt_zhang_2022(args):
@@ -258,7 +260,12 @@ class TokenGTModel(FairseqEncoderModel):
 
     def forward(self, batched_data, **kwargs):
         # stem - nn.Linear(32, 16).to(batched_data['node_data'].device)(batched_data['node_data']).shape
-        return self.encoder(batched_data, **kwargs)
+        node_data = self.encoder(batched_data, **kwargs)
+        st = time.time()
+        data_handler, data_converter = get_data_converter(self.args)
+        dc = data_converter(node_data, batched_data["mapping_from_orig_to_subgraphs"])
+        print(f"ET [DatasetConverter]: {time.time() - st:.8f}")
+        return dc
 
 
 class TokenGTEncoder(FairseqEncoder):

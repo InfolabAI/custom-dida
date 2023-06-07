@@ -2,7 +2,6 @@ from trainer import Trainer
 from model_DIDA.utils.inits import prepare
 from torch_geometric.utils import negative_sampling
 from model_DIDA.utils.mutils import *
-from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
 from tqdm import tqdm
 from plot_based_on_hub_nodes import PlotBasedOnHubNodes
 

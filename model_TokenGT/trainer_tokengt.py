@@ -2,7 +2,6 @@ from trainer import Trainer
 from model_DIDA.utils.inits import prepare
 from torch_geometric.utils import negative_sampling
 from model_DIDA.utils.mutils import *
-from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
 from hook import gradient_hook, forward_hook
 import time
 from tqdm import tqdm
@@ -72,7 +71,7 @@ class Trainer_TokenGT(Trainer):
 
             loss = cal_loss(cy, edge_label)
 
-            st = time.process_time()
+            st = time.time()
             optimizer.zero_grad()
             loss.backward()
             # TODO ANKI [OBNOTE: ] - grad_fn 을 따라 올라가면서 연산과정을 확인하는 방법
@@ -85,6 +84,7 @@ class Trainer_TokenGT(Trainer):
             # TODO END ANKI
             # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
             optimizer.step()
+            print(f"ET [lossbackward and step]: {time.time() - st:.8f}")
             epoch_losses.append(loss.detach().item())
             # pbar.set_postfix(loss=f"{loss.detach().item():.4f}")
             # pbar.update(1)

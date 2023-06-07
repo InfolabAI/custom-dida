@@ -5,7 +5,9 @@ from dataset_loader.template import DatasetTemplate
 from model_DIDA.utils.mutils import bi_negative_sampling
 
 
+# TODO ANKI [OBNOTE: ] - build dict from dgl
 class PreprocessDictFromDGL:
+    # TODO END ANKI
     def __init__(self, dgl_folder_path, dict_graph_folder_path):
         graph_dict = self.load_pt_files_from_folder(dict_graph_folder_path, torch.load)
         if graph_dict is None:

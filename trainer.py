@@ -1,6 +1,6 @@
 from runner import RunnerProperty
-from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
 import numpy as np
+from model_TokenGT.dataset_handler_get import get_data_converter
 
 
 class Trainer:
@@ -11,8 +11,9 @@ class Trainer:
 
     # TODO ANKI [OBNOTE: ] - shuffle and preprocess data
     def preprocess_data_per_ex(self, x, data):
-        if self.args.model == "tokengt":
-            data_ = TokenGTDataset(x, data, self.args.device)
+        data_handler, data_converter = get_data_converter(self.args)
+        if data_handler is not None:
+            data_ = data_handler(x, data, self.args.device)
         else:
             data_ = data
 
@@ -24,16 +25,14 @@ class Trainer:
             if self.args.model == "dida":
                 for key in data.keys():
                     data[key] = self.shuffle(data[key], key=key)
-            elif self.args.model == "tokengt":
-                data.converted_data_list = self.shuffle(
-                    data.converted_data_list, key="tokengt"
-                )
+            elif "tokengt" in self.args.model:
+                data.converted_data_list = self.shuffle(data.converted_data_list)
 
     def train(self, data):
         self.preprocess_data_per_epoch(data)
         pass
 
-    def shuffle(self, edges_with_time_stamps, key):
+    def shuffle(self, edges_with_time_stamps):
         # TODO ANKI [OBNOTE: ] - sample indices without duplication by using numpy
         indices = np.random.choice(
             np.arange(len(edges_with_time_stamps)),

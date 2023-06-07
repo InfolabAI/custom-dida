@@ -1,3 +1,5 @@
+# deprecated codes
+# instead of this code, use preprocess_dgl_brw.py and preprocess_dict_from_dgl.py
 import torch
 import pandas as pd
 import datetime

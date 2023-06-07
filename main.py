@@ -2,7 +2,7 @@ from config import args
 from model_DIDA.utils.mutils import *
 from model_DIDA.utils.data_util import *
 from model_DIDA.utils.util import init_logger
-from model_TokenGT.dataset_handler_tokengt import test
+from model_TokenGT.dataset_handler_tokengt_noCD import test
 from torch.utils.tensorboard import SummaryWriter
 import warnings
 from datetime import datetime
@@ -56,7 +56,7 @@ from model_DIDA.model import DGNN
 from model_TokenGT.model_tokengt import TokenGTModel
 
 try:
-    if args.model == "tokengt":
+    if "tokengt" in args.model:
         model = TokenGTModel.build_model(args).to(args.device)
         args.log_dir += f"{model.tokengt_args.activation_fn}"
         prepare_dir(args.log_dir)

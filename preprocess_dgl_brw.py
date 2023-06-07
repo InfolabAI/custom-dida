@@ -1,6 +1,8 @@
-from dataset_loader.link import BitcoinAlpha
 from dataset_loader.link import RedditBody
 from dataset_loader.link import WikiElec
+
+# TODO ANKI [OBNOTE: ] - load dgl from raw data
+from dataset_loader.link import BitcoinAlpha
 
 btdt = BitcoinAlpha(
     input_dim=32,
@@ -11,6 +13,7 @@ btdt = BitcoinAlpha(
     time_aggregation=3600 * 24 * 7 * 2,
 )
 btdt.preprocess()
+# TODO END ANKI
 rbdt = RedditBody(
     input_dim=32,
     train_ratio=0.7,

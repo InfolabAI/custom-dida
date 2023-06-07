@@ -2,6 +2,7 @@
 Modified from https://github.com/microsoft/Graphormer
 """
 
+import time
 from typing import Optional, Tuple
 
 import torch
@@ -13,7 +14,6 @@ from .performer_pytorch import ProjectionUpdater
 from .multihead_attention import MultiheadAttention
 from .tokenizer import GraphFeatureTokenizer
 from .tokengt_graph_encoder_layer import TokenGTGraphEncoderLayer
-from ..dataset_handler_tokengt import DatasetConverter
 from hook import gradient_hook_for_tensor
 
 
@@ -279,6 +279,7 @@ class TokenGTGraphEncoder(nn.Module):
         token_embeddings: Optional[torch.Tensor] = None,
         attn_mask: Optional[torch.Tensor] = None,
     ):
+        st = time.time()
         is_tpu = False
 
         if self.performer and self.performer_auto_check_redraw:
@@ -333,7 +334,6 @@ class TokenGTGraphEncoder(nn.Module):
         # x.register_hook(gradient_hook_for_tensor)
         # TODO END ANKI
         # restore node_features (i.e., batched_data['node_data'])
-        node_data_at_time_t = x.transpose(0, 1)[padded_node_mask, :]
-        return DatasetConverter(
-            node_data_at_time_t, batched_data["cur_x_to_node_data_mapping_dict"]
-        )
+        node_data = x.transpose(0, 1)[padded_node_mask, :]
+        print(f"ET [pure forward]: {time.time() - st:.8f}")
+        return node_data

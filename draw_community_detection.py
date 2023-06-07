@@ -46,6 +46,7 @@ class CommunityDetection:
         # self.draw_nx_graph(G, partition, nx.shell_layout)
         # self.draw_nx_graph(G, partition, nx.spiral_layout)
 
+    @classmethod
     def edge_tensor_to_graph(self, edge_tensor):
         """
         Examples:
