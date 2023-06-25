@@ -49,7 +49,7 @@ parser.add_argument(
     "--model", type=str, help="tokengt_nocd | tokengt_cd | tokengt_cdrandom | dida"
 )
 parser.add_argument(
-    "--max_epoch", type=int, default=1000, help="number of epochs to train."
+    "--max_epoch", type=int, default=100, help="number of epochs to train."
 )
 parser.add_argument("--testlength", type=int, default=3, help="length for test")
 parser.add_argument("--device", type=str, default="cpu", help="training device")

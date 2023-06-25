@@ -11,6 +11,7 @@ class CommunityDetection:
         args : argparse
         edge_tensor : [2, num_edges]
         """
+        self.args = args
         G = self.edge_tensor_to_graph(edge_tensor)
         self.version = args.model
         if self.version == "tokengt_cd":
@@ -31,6 +32,7 @@ class CommunityDetection:
         ----------
         G : networkx graph
         """
+
         # get community size
         partition = self.louvain(G)
         community_size = max(partition.values()) + 1
@@ -47,7 +49,12 @@ class CommunityDetection:
         ----------
         G : networkx graph
         """
-        partition = community_louvain.best_partition(G)
+        if self.args.dataset == "collab":
+            # To save memory, use resolution=0.01, but, reduced memory is not enough (23.5G -> 17.5G)
+            # partition = community_louvain.best_partition(G, resolution=0.01)
+            partition = community_louvain.best_partition(G)
+        else:
+            partition = community_louvain.best_partition(G)
         return partition
 
     @classmethod

@@ -1,3 +1,4 @@
+import os
 from config import args
 from model_DIDA.utils.mutils import *
 from model_DIDA.utils.data_util import *
@@ -73,7 +74,12 @@ try:
     info_dict = get_arg_dict(args)
     json.dump(info_dict, open(osp.join(args.log_dir, "info.json"), "w"))
 
-    runner = Runner(args, model, data, writer=SummaryWriter(args.log_dir))
+    runner = Runner(
+        args,
+        model,
+        data,
+        writer=SummaryWriter(os.path.join(args.log_dir, f"seed{args.seed}")),
+    )
     results = runner.run()
 
     # post-logs

@@ -4,7 +4,7 @@
 from typing import Any
 import torch
 import numpy as np
-from collections import defaultdict
+from collections import defaultdict, Counter
 from community import community_louvain
 from community_dectection import CommunityDetection
 from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
@@ -150,6 +150,10 @@ class TokenGTDatasetCD(TokenGTDataset):
         cur_edge_data = torch.ones(cur_edges.shape[1], cur_x.shape[1])
         cd = CommunityDetection(self.args, cur_edges)
         partition = cd.partition
+        print(f"MAX COMMUNITY NUMBER at time {time_t}: {max(partition.values())}")
+        print(
+            f"MAX COMMUNITY SIZE at time {time_t}: {max(Counter(partition.values()).values())}"
+        )
 
         # generate subgraphs
         (
