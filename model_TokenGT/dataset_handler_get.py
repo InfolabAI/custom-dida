@@ -11,7 +11,7 @@ from model_TokenGT.dataset_handler_tokengt_CD import (
 def get_data_converter(args):
     if args.model == "tokengt_nocd":
         return TokenGTDataset_noCD, DatasetConverter
-    elif args.model == "tokengt_cd":
+    elif "tokengt_cd" in args.model:
         return TokenGTDatasetCD, DatasetConverterCD
     elif args.model == "dida":
         return None, None
