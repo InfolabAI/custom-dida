@@ -32,14 +32,22 @@ parser.add_argument(
     help="if this option is 1, the stats based on hub nodes are plotted",
 )
 parser.add_argument(
-    "--draw_community_detection",
+    "--plot_graphs_community_detection",
     type=int,
     default=0,
     help="if this option is 1, the graphs based on community detection are drawed",
 )
+parser.add_argument(
+    "--plot_sparsity_mat_cd",
+    type=int,
+    default=0,
+    help="if this option is 1, the sparsity of adj matrix based on community detection are drawed",
+)
 
 # 2.experiments
-parser.add_argument("--model", type=str, help="tokengt | dida")
+parser.add_argument(
+    "--model", type=str, help="tokengt_nocd | tokengt_cd | tokengt_cdrandom | dida"
+)
 parser.add_argument(
     "--max_epoch", type=int, default=1000, help="number of epochs to train."
 )

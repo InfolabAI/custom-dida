@@ -70,9 +70,9 @@ class DatasetConverter:
 
 
 class TokenGTDataset_noCD(TokenGTDataset):
-    def __init__(self, x, data: dict, device):
+    def __init__(self, x, data: dict, args):
         self.sample_num_edge = 50  # sample number of subedges at once
-        super().__init__(x, data, device)
+        super().__init__(x, data, args)
 
     def sample_subedges(self, cur_edges, cur_edge_data):
         """

@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from collections import defaultdict
 from community import community_louvain
-from draw_community_detection import CommunityDetection
+from community_dectection import CommunityDetection
 from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
 
 
@@ -45,13 +45,15 @@ class DatasetConverterCD:
 
 
 class TokenGTDatasetCD(TokenGTDataset):
-    def __init__(self, x, data: dict, device):
+    def __init__(self, x, data: dict, args):
         """
+        이 클래스 자체가 dataset 역할을 수행함
+
         Args:
             x (tensor): the node features with dimension [#nodes, dim of a node feature]
             data (dict): the edge informations with keys ['edge_index_list', 'pedges', 'nedges']
         """
-        super().__init__(x, data, device)
+        super().__init__(x, data, args)
 
     def get_edges_from_node_indices(self, cur_edges, cur_edge_data, node_indices):
         bool_tensor = None
@@ -146,8 +148,8 @@ class TokenGTDatasetCD(TokenGTDataset):
         cur_edges = self.remove_duplicated_edges(self.data["pedges"][time_t].long())
         cur_x = self.x[time_t]
         cur_edge_data = torch.ones(cur_edges.shape[1], cur_x.shape[1])
-        networkx_graph = CommunityDetection.edge_tensor_to_graph(cur_edges)
-        partition = community_louvain.best_partition(networkx_graph)
+        cd = CommunityDetection(self.args, cur_edges)
+        partition = cd.partition
 
         # generate subgraphs
         (

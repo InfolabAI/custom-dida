@@ -13,7 +13,7 @@ class Trainer:
     def preprocess_data_per_ex(self, x, data):
         data_handler, data_converter = get_data_converter(self.args)
         if data_handler is not None:
-            data_ = data_handler(x, data, self.args.device)
+            data_ = data_handler(x, data, self.args)
         else:
             data_ = data
 

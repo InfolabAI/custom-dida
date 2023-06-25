@@ -9,7 +9,7 @@ from datetime import datetime
 from model_TokenGT.visualize_edges import VisualizeEdges
 from model_TokenGT.preprocess_raw_data import PreprocessBitcoinAlpha
 from util_hee import get_current_datetime
-from draw_community_detection import CommunityDetection
+from plot_graph_community_detection import PlotGraphMat
 
 
 # TODO ANKI [OBNOTE: ] - what is this?
@@ -43,7 +43,7 @@ if args.plot > 0:
 
 # load data
 args, data = load_data(args)
-CommunityDetection(args, args.dataset, data["train"]["pedges"])
+PlotGraphMat(args, args.dataset, data["train"]["pedges"])
 
 # pre-logs
 args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_"

@@ -3,7 +3,7 @@ import numpy as np
 
 
 class TokenGTDataset(torch.utils.data.Dataset):
-    def __init__(self, x, data: dict, device):
+    def __init__(self, x, data: dict, args):
         """
         Args:
             x (tensor): the node features with dimension [#nodes, dim of a node feature]
@@ -11,7 +11,8 @@ class TokenGTDataset(torch.utils.data.Dataset):
         """
         self.x = x
         self.data = data
-        self.device = device
+        self.args = args
+        self.device = args.device
         self.max_time = len(self.data["pedges"])
         self.sample_num_node_with_no_edge = 100
         self.convert_all()
