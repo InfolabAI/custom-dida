@@ -1,5 +1,4 @@
 from trainer import Trainer
-from model_DIDA.utils.inits import prepare
 from torch_geometric.utils import negative_sampling
 from model_DIDA.utils.mutils import *
 from hook import gradient_hook, forward_hook
@@ -8,8 +7,8 @@ from tqdm import tqdm
 
 
 class Trainer_TokenGT(Trainer):
-    def __init__(self, args, model):
-        super().__init__(args, model)
+    def __init__(self, args, model, data_to_prepare):
+        super().__init__(args, model, data_to_prepare)
         pass
 
     def train(self, epoch, data):
@@ -47,7 +46,7 @@ class Trainer_TokenGT(Trainer):
             #    breakpoint()
             # TODO END ANKI
 
-            pos_edge_index = prepare(data.data, t + 1)[0]
+            pos_edge_index = self.prepare(t + 1)[0]
             if args.dataset == "yelp":
                 neg_edge_index = bi_negative_sampling(
                     pos_edge_index, args.num_nodes, args.shift

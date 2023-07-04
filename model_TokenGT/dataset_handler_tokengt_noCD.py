@@ -6,7 +6,7 @@ from collections import defaultdict
 from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
 
 
-class DatasetConverter:
+class DatasetConverter_noCD:
     def __init__(self, node_data, mapping_dict):
         """
         Args:
@@ -196,6 +196,9 @@ class TokenGTDataset_noCD(TokenGTDataset):
         a_graph_at_a_time_with_no_edge = self.generate_subgraphs_with_no_edges(
             cur_x, total_indices_subnodes_with_edges
         )
+
+        if a_graph_at_a_time_with_no_edge is None:
+            return a_graph_at_a_time
 
         # integrate two dicts
         a_graph_at_a_time["node_data"] = torch.concat(

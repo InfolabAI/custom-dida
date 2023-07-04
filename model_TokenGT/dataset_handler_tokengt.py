@@ -30,7 +30,16 @@ class TokenGTDataset(torch.utils.data.Dataset):
         # duplicated edges are [src1, dst1] and [dst1, src1], so we sort them and remove the duplicated ones
         # TODO ANKI [OBNOTE: ] - For example, a duplicated edge is [src1, dst1] and [dst1, src1], so we sort them and remove the duplicated ones
         # edges (tensor): [2, #edges]
-        return (torch.sort(edges, dim=0)[0]).unique(dim=1)
+        original_edge_num = edges.shape[1]
+        edges = (torch.sort(edges, dim=0)[0]).unique(dim=1)
+        remove_dup_edge_num = edges.shape[1]
+        edges = edges[:, edges[0] != edges[1]]
+        remove_self_loop = edges.shape[1]
+        print(
+            f"Remove duplicated edges: {original_edge_num - remove_dup_edge_num} and self-loop edges: {remove_dup_edge_num - remove_self_loop}"
+        )
+        return edges
+
         # TODO END ANKI
 
     # TODO ANKI [OBNOTE: ] -
@@ -43,6 +52,9 @@ class TokenGTDataset(torch.utils.data.Dataset):
         indices_nodes_with_no_edge = np.setdiff1d(
             np.arange(cur_x.shape[0]), total_indices_subnodes_with_edges
         )
+        if len(indices_nodes_with_no_edge) == 0:
+            return None
+
         node_num = []
         edge_num = []
         # edge_index = []

@@ -23,13 +23,14 @@ class PlotGraphMat:
 
         for time_t, edge_tensor in enumerate(edge_tensor_list):
             self.time_t = time_t
-            cd = CommunityDetection(args, edge_tensor)
 
             if args.plot_graphs_community_detection == 1:
+                cd = CommunityDetection(args, edge_tensor)
                 self.save_path = f"logs/graphs/{args.model}_{dataset}"
                 os.makedirs(self.save_path, exist_ok=True)
                 self.plot_nx_graph(cd.G, cd.partition, nx.spring_layout, k=0.05)
             elif args.plot_sparsity_mat_cd == 1:
+                cd = CommunityDetection(args, edge_tensor)
                 self.save_path = f"logs/sparsity_mat/{args.model}_{dataset}"
                 # partition 번호: node 번호 로 변환
                 partition_to_node_dict = defaultdict(list)
@@ -104,7 +105,6 @@ class PlotGraphMat:
         plt.colorbar(im)
         # TODO ANKI [OBNOTE: ] - convert function into text
         plt.savefig(f"{self.save_path}/{self.time_t}.png", dpi=2000)
-        # TODO END ANKI
         plt.cla()
         plt.clf()
 

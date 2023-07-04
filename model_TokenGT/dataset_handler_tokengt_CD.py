@@ -10,7 +10,7 @@ from community_dectection import CommunityDetection
 from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
 
 
-class DatasetConverterCD:
+class DatasetConverter_CD:
     def __init__(self, node_data, mapping_dict):
         """
         Args:
@@ -44,7 +44,7 @@ class DatasetConverterCD:
         return self
 
 
-class TokenGTDatasetCD(TokenGTDataset):
+class TokenGTDataset_CD(TokenGTDataset):
     def __init__(self, x, data: dict, args):
         """
         이 클래스 자체가 dataset 역할을 수행함
@@ -165,6 +165,9 @@ class TokenGTDatasetCD(TokenGTDataset):
             cur_x, total_indices_subnodes_with_edges
         )
 
+        if a_graph_at_a_time_with_no_edge is None:
+            return a_graph_at_a_time
+
         # integrate two dicts
         a_graph_at_a_time["node_data"] = torch.concat(
             [
@@ -198,7 +201,7 @@ class TokenGTDatasetCD(TokenGTDataset):
 
 
 def test(args, x, data):
-    dataset = TokenGTDatasetCD(x, data, args.device)
+    dataset = TokenGTDataset_CD(x, data, args.device)
     for index in range(len(dataset)):
         batch = dataset[index]
         print(batch)

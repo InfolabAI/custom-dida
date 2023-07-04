@@ -1,5 +1,4 @@
 from trainer import Trainer
-from model_DIDA.utils.inits import prepare
 from torch_geometric.utils import negative_sampling
 from model_DIDA.utils.mutils import *
 from tqdm import tqdm
@@ -7,8 +6,8 @@ from plot_based_on_hub_nodes import PlotBasedOnHubNodes
 
 
 class Tester_TokenGT(Trainer):
-    def __init__(self, args, model):
-        super().__init__(args, model)
+    def __init__(self, args, model, data_to_prepare):
+        super().__init__(args, model, data_to_prepare)
         pass
 
     def test(self, epoch, data):
@@ -45,7 +44,7 @@ class Tester_TokenGT(Trainer):
                 pbar.set_description("Test")
                 for t in range(self.runnerProperty.len - 1):
                     z = cs[t]
-                    _, pos_edge, neg_edge = prepare(data.data, t + 1)[:3]
+                    _, pos_edge, neg_edge = self.prepare(t + 1)[:3]
                     auc, ap = self.runnerProperty.loss.predict(
                         z, pos_edge, neg_edge, self.model.cs_decoder
                     )

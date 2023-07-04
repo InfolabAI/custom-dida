@@ -1,13 +1,12 @@
 from trainer import Trainer
-from model_DIDA.utils.inits import prepare
 from torch_geometric.utils import negative_sampling
 from model_DIDA.utils.mutils import *
 from tqdm import tqdm
 
 
 class Trainer_DIDA(Trainer):
-    def __init__(self, args, model):
-        super().__init__(args, model)
+    def __init__(self, args, model, data_to_prepare):
+        super().__init__(args, model, data_to_prepare)
         pass
 
     def train(self, epoch, data):
@@ -44,7 +43,7 @@ class Trainer_DIDA(Trainer):
         train_auc_list = []
         for t in range(self.runnerProperty.len - 1):
             z = cs[t]
-            _, pos_edge, neg_edge = prepare(data, t + 1)[:3]
+            _, pos_edge, neg_edge = self.prepare(t + 1)[:3]
             auc, ap = self.runnerProperty.loss.predict(
                 z, pos_edge, neg_edge, self.model.cs_decoder
             )
@@ -63,7 +62,7 @@ class Trainer_DIDA(Trainer):
         ## edge label construction
         for t in range(self.runnerProperty.len_train - 1):
             z = embeddings[t]  # only used for obtaining dimension
-            pos_edge_index = prepare(data, t + 1)[0]
+            pos_edge_index = self.prepare(t + 1)[0]
             if args.dataset == "yelp":
                 neg_edge_index = bi_negative_sampling(
                     pos_edge_index, args.num_nodes, args.shift

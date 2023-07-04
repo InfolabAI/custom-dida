@@ -249,10 +249,10 @@ class MultiplyPredictor(torch.nn.Module):
 class DGNN(nn.Module):
     """Our proposed Disentangled Dynamic Graph Attention Networks"""
 
-    def __init__(self, args=None):
+    def __init__(self, args, data_to_prepare):
         super(DGNN, self).__init__()
-        self.trainer = Trainer_DIDA(args, self)
-        self.tester = Tester_DIDA(args, self)
+        self.trainer = Trainer_DIDA(args, self, data_to_prepare)
+        self.tester = Tester_DIDA(args, self, data_to_prepare)
         self.args = args
 
         n_layers = args.n_layers

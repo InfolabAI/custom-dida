@@ -51,12 +51,14 @@ class GroupMultipleRuns:
     def write_combined_events(self, dpath, d_combined):
         os.makedirs(dpath, exist_ok=True)
         writer = SummaryWriter(dpath)
-        tags, values = zip(*d_combined.items())
-        timestep_mean = np.array(values).mean(axis=-1)
+        tags, tag_values = zip(*d_combined.items())
         print(
             "WARNING: Steps (x-axis) of current function starts from 1. You may need to start from 0."
         )
-        for tag, means in zip(tags, timestep_mean):
+        for tag, values in zip(tags, tag_values):
+            # drop a run which is the most outlier. (100, 3) -> (100, 2) without outlier
+            indices = np.argsort(np.array(values).mean(axis=0))[1:]
+            means = np.array(values)[:, indices].mean(axis=-1)
             for i, mean in enumerate(means):
                 # summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=mean)])
                 writer.add_scalar(tag, mean, i + 1)

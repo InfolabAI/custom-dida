@@ -1,4 +1,5 @@
 import os
+import copy
 from config import args
 from model_DIDA.utils.mutils import *
 from model_DIDA.utils.data_util import *
@@ -44,6 +45,9 @@ if args.plot > 0:
 
 # load data
 args, data = load_data(args)
+data_to_prepare = copy.deepcopy(
+    data["train"]
+)  # loss 계산 또는 auc 계산을 위한 원본 데이터 (edges), 즉, not augmented edges
 PlotGraphMat(args, args.dataset, data["train"]["pedges"])
 
 # pre-logs
@@ -58,7 +62,7 @@ from model_TokenGT.model_tokengt import TokenGTModel
 
 try:
     if "tokengt" in args.model:
-        model = TokenGTModel.build_model(args).to(args.device)
+        model = TokenGTModel.build_model(args, data_to_prepare).to(args.device)
         args.log_dir += f"{model.tokengt_args.activation_fn}"
         prepare_dir(args.log_dir)
         tokengt_info_dict = get_arg_dict(model.tokengt_args)
@@ -66,7 +70,7 @@ try:
             tokengt_info_dict, open(osp.join(args.log_dir, "tokengt_info.json"), "w")
         )
     elif args.model == "dida":
-        model = DGNN(args=args).to(args.device)
+        model = DGNN(args, data_to_prepare).to(args.device)
         prepare_dir(args.log_dir)
     else:
         raise Exception("Unknown model: {}".format(args.model))

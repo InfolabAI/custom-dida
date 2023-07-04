@@ -44,7 +44,16 @@ parser.add_argument(
     help="if this option is 1, the sparsity of adj matrix based on community detection are drawed",
 )
 
-# 2.experiments
+# 2-1. augmentation
+parser.add_argument(
+    "--augment",
+    type=str,
+    default="no",
+    help="tiara | no",
+)
+
+
+# 3.experiments
 parser.add_argument(
     "--model", type=str, help="tokengt_nocd | tokengt_cd | tokengt_cdrandom | dida"
 )
