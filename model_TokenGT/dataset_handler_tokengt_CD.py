@@ -8,6 +8,7 @@ from collections import defaultdict, Counter
 from community import community_louvain
 from community_dectection import CommunityDetection
 from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
+from util_hee import remove_duplicated_edges
 
 
 class DatasetConverter_CD:
@@ -85,6 +86,11 @@ class TokenGTDataset_CD(TokenGTDataset):
         for nodeid, partition_id in partition.items():
             new_partition[partition_id] += [nodeid]
 
+        # sort by partition size
+        # new_partition = dict(
+        #    sorted(new_partition.items(), key=lambda x: len(x[1]), reverse=True)
+        # )
+
         for partition_id, indices_subnodes in new_partition.items():
             subedges, subedge_data = self.get_edges_from_node_indices(
                 cur_edges, cur_edge_data, indices_subnodes
@@ -134,6 +140,24 @@ class TokenGTDataset_CD(TokenGTDataset):
             total_indices_subnodes_with_edges,
         )  # represent one example in torch.utils.data.DataLoader
 
+    def generate_edge_data(self, cur_edges, cur_weights, dim):
+        """
+        Args:
+            cur_edges (tensor): [#edges, 2]
+            cur_weights (tensor): [#edges, 1]
+            dim (int): dimension of a edge feature
+
+        Returns:
+            edge_data (tensor): [#edges, dim]
+        """
+        edge_data = torch.zeros(cur_edges.shape[1], dim)
+
+        for id_, (i, j) in enumerate(cur_edges.t()):
+            i, j = int(i), int(j)
+            edge_data[id_].fill_(cur_weights[(i, j)])
+
+        return edge_data
+
     def convert_to_tokengt_input(self, time_t):
         """
         (Pdb) p cur_pedges.shape
@@ -145,14 +169,18 @@ class TokenGTDataset_CD(TokenGTDataset):
         # TODO idea: train edge 들만 가지고 partition 을 만들어야 정확하다고 생각됨
         # TODO 반대 idea: 어차피 t+1 때의 edge 를 맞추는 것이기 때문에, t 때의 edge 들로 partition 을 만들어도 상관없음
         # TODO END ANKI
-        cur_edges = self.remove_duplicated_edges(self.data["pedges"][time_t].long())
+        cur_edges = remove_duplicated_edges(self.data["pedges"][time_t].long())
         cur_x = self.x[time_t]
-        cur_edge_data = torch.ones(cur_edges.shape[1], cur_x.shape[1])
-        cd = CommunityDetection(self.args, cur_edges)
+        cur_edge_weights = self.data["weights"][time_t]
+        cur_edge_data = self.generate_edge_data(
+            cur_edges, cur_edge_weights, cur_x.shape[1]
+        )
+        cd = CommunityDetection(self.args, cur_edges, cur_edge_weights)
         partition = cd.partition
-        print(f"MAX COMMUNITY NUMBER at time {time_t}: {max(partition.values())}")
+
+        print(f"THE NUMBER OF COMMUNITIES AT TIME {time_t}: {max(partition.values())}")
         print(
-            f"MAX COMMUNITY SIZE at time {time_t}: {max(Counter(partition.values()).values())}"
+            f"MAX COMMUNITY SIZE AT TIME {time_t}: {max(Counter(partition.values()).values())}"
         )
 
         # generate subgraphs

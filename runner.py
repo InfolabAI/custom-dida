@@ -7,6 +7,7 @@ import numpy as np
 import torch.optim as optim
 from model_DIDA.utils.mutils import *
 from augmenter.tiara import TiaRa
+from augmenter.edge_propagation import EdgePropagation
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -105,19 +106,26 @@ class Runner(object):
 
         if self.args.augment == "no":
             pass
+        elif self.args.augment == "edgeprop":
+            aug = EdgePropagation(
+                args,
+                self.data,
+                None,
+                device=f"cuda:{args.device_id}",
+            )
+            self.data = aug()
+
         elif self.args.augment == "tiara":
-            tiara = TiaRa(
-                self.data["x"].shape[0],
-                self.data["train"]["pedges"],
+            aug = TiaRa(
+                self.data,
                 alpha=0.2,
                 beta=0.3,
-                eps=0.1,
+                eps=0.05,
                 K=100,
                 symmetric_trick=False,
                 device=f"cuda:{args.device_id}",
             )
-            self.data["train"]["pedges"] = tiara()
-            self.data["train"]["edge_index_list"] = self.data["train"]["pedges"]
+            self.data = aug()
             pass
         else:
             raise NotImplementedError("augment not implemented")

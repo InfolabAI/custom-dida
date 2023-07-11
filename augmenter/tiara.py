@@ -1,4 +1,4 @@
-import torch, dgl
+import torch
 import utils_TiaRa
 from augmenter.augmenter import Augmenter
 from tqdm.autonotebook import tqdm
@@ -42,8 +42,7 @@ class TiaRa(Augmenter):
 
     def __init__(
         self,
-        num_nodes,
-        original_edge_tensors,
+        data,
         alpha=0.2,
         beta=0.3,
         eps=1e-3,
@@ -58,7 +57,7 @@ class TiaRa(Augmenter):
         assert 0 <= alpha + beta and alpha + beta <= 1
         assert 0 < eps
 
-        super().__init__(num_nodes, original_edge_tensors)
+        super().__init__(data)
 
         self.alpha = alpha
         self.beta = beta
@@ -132,37 +131,6 @@ class TiaRa(Augmenter):
 
         return new_graphs
 
-    def row_sum(self, A, dense=None):
-        if dense is None:
-            dense = self.dense
-        if dense:
-            return A.sum(dim=1)
-        else:
-            return torch.sparse.sum(A, dim=1).to_dense()
-
-    def normalize(self, A, ord="row", dense=None):
-        if dense is None:
-            dense = self.dense
-
-        N = A.shape[0]
-        A = A if ord == "row" else A.transpose(0, 1)
-
-        norm = self.row_sum(A, dense=dense)
-        norm[norm <= 0] = 1
-        if ord == "sym":
-            norm = norm**0.5
-
-        if dense:
-            inv_D = torch.diag(1 / norm)
-        else:
-            inv_D = utils_TiaRa.sparse_diag(1 / norm)
-
-        if ord == "sym":
-            nA = inv_D @ A @ inv_D
-        else:
-            nA = inv_D @ A
-        return nA if ord == "row" else nA.transpose(0, 1)
-
     def approx_inv_Ht(self, A, alpha, beta, K=10):
         if self.dense:
             I = torch.eye(A.shape[0], device=self.device)
@@ -177,38 +145,3 @@ class TiaRa(Augmenter):
             inv_H_k = I + cAT @ inv_H_k
 
         return inv_H_k
-
-    def filter_matrix(self, X, eps):
-        assert eps < 1.0
-        if self.dense:
-            X[X < eps] = 0.0
-        else:
-            X = utils_TiaRa.sparse_filter(X, eps)
-        return self.normalize(X, ord="col")
-
-
-class Merge:
-    def __init__(self, device):
-        self.device = device
-
-    def __call__(self, dataset):
-        merged_graphs = [dataset[0]]
-
-        for graph in dataset[1:]:
-            merged_graph = dgl.merge([merged_graphs[-1], graph])
-            merged_graph = merged_graph.cpu().to_simple().to(self.device)
-            del merged_graph.edata["count"]
-            merged_graphs.append(merged_graph)
-
-        return GCNNorm(self.device)(merged_graphs)
-
-
-class GCNNorm:
-    def __init__(self, device):
-        self.device = device
-
-    def __call__(self, dataset):
-        normalized = [
-            utils_TiaRa.graph_to_normalized_adjacency(graph) for graph in dataset
-        ]
-        return [utils_TiaRa.weighted_adjacency_to_graph(adj) for adj in normalized]

@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from util_hee import remove_duplicated_edges
 
 
 class TokenGTDataset(torch.utils.data.Dataset):
@@ -21,26 +22,6 @@ class TokenGTDataset(torch.utils.data.Dataset):
         self.converted_data_list = []
         for t in range(self.max_time):
             self.converted_data_list += [self.convert_to_tokengt_input(t)]
-
-    def remove_duplicated_edges(self, edges):
-        """
-        Args:
-            edges (tensor): [2, #edges]
-        """
-        # duplicated edges are [src1, dst1] and [dst1, src1], so we sort them and remove the duplicated ones
-        # TODO ANKI [OBNOTE: ] - For example, a duplicated edge is [src1, dst1] and [dst1, src1], so we sort them and remove the duplicated ones
-        # edges (tensor): [2, #edges]
-        original_edge_num = edges.shape[1]
-        edges = (torch.sort(edges, dim=0)[0]).unique(dim=1)
-        remove_dup_edge_num = edges.shape[1]
-        edges = edges[:, edges[0] != edges[1]]
-        remove_self_loop = edges.shape[1]
-        print(
-            f"Remove duplicated edges: {original_edge_num - remove_dup_edge_num} and self-loop edges: {remove_dup_edge_num - remove_self_loop}"
-        )
-        return edges
-
-        # TODO END ANKI
 
     # TODO ANKI [OBNOTE: ] -
     def generate_subgraphs_with_no_edges(

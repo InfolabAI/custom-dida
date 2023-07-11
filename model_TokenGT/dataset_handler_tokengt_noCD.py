@@ -4,6 +4,7 @@ import torch
 import numpy as np
 from collections import defaultdict
 from model_TokenGT.dataset_handler_tokengt import TokenGTDataset
+from util_hee import remove_duplicated_edges
 
 
 class DatasetConverter_noCD:
@@ -181,7 +182,7 @@ class TokenGTDataset_noCD(TokenGTDataset):
             torch.Size([23035, 32]) # [#nodes, dim of a node feature]
         """
         cur_edges = self.data["pedges"][time_t].long()
-        cur_edges = self.remove_duplicated_edges(cur_edges)
+        cur_edges = remove_duplicated_edges(cur_edges)
         cur_x = self.x[time_t]
         cur_edge_data = torch.ones(cur_edges.shape[1], cur_x.shape[1])
         # select x from edges
@@ -243,7 +244,6 @@ class TokenGTDataset_noCD(TokenGTDataset):
         #        :, offset_edge : sum(batch_graph["edge_num"])
         #    ]
         #    offset_edge += sum(batch_graph["edge_num"])
-        #    breakpoint()
         #    yield batch_graph
 
     def reverse_cur_x(self):

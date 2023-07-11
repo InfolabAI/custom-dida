@@ -6,7 +6,13 @@ import torch
 
 class ConvertGraphTypes:
     def dgl_to_networkx(self, dglG):
-        nx_graph = dglG.to_networkx()
+        """
+        Examples
+        --------
+        >>> nx_graph.get_edge_data(0,0)
+        >>> {'id': 0, 'w': tensor(1.)}
+        """
+        nx_graph = nx.Graph(dglG.to_networkx(edge_attrs=["w"]))
         return nx_graph
 
     def networkx_to_dgl(self, nx_graph):
@@ -42,13 +48,23 @@ class ConvertGraphTypes:
         # convert edge_tensor to tensor.long
         edge_tensor = torch.from_numpy(edge_tensor).long()
 
+        weights_t = {}
         for i in range(num_edges):
-            edge_tensor[0][i] = edge_list[i][0]
-            edge_tensor[1][i] = edge_list[i][1]
+            node_i = edge_list[i][0]
+            node_j = edge_list[i][1]
+            edge_tensor[0][i] = node_i
+            edge_tensor[1][i] = node_j
+            # undirected graph이므로 엣지의 가중치는 양방향 엣지의 가중치의 평균으로 정의합니다
+            weight = (
+                float(nx_graph.get_edge_data(node_i, node_j)["w"])
+                + float(nx_graph.get_edge_data(node_j, node_i)["w"])
+            ) / 2
+            weights_t[(int(node_i), int(node_j))] = weight
+            weights_t[(int(node_j), int(node_i))] = weight
 
-        return edge_tensor
+        return edge_tensor, weights_t
 
-    def edge_tensor_to_networkx(self, edge_tensor, num_nodes=0):
+    def edge_tensor_to_networkx(self, edge_tensor, edge_weights, num_nodes=0):
         """
         Parameters
         --------
@@ -82,6 +98,8 @@ class ConvertGraphTypes:
         for i in range(num_edges):
             source_node = int(source_nodes[i].numpy())
             dest_node = int(dest_nodes[i].numpy())
-            graph.add_edge(source_node, dest_node, weight=1)
+            graph.add_edge(
+                source_node, dest_node, weight=edge_weights[(source_node, dest_node)]
+            )
 
         return graph

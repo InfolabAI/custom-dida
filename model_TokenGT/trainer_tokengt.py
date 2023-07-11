@@ -34,7 +34,7 @@ class Trainer_TokenGT(Trainer):
         ## edge label construction
         # with tqdm(total=self.runnerProperty.len_train - 1) as pbar:
         for t in range(self.runnerProperty.len_train - 1):
-            print(f"t = {t}")
+            # print(f"t = {t}")
             # pbar.set_description(f"Processing item {t}")
 
             batch = data[t]
@@ -43,7 +43,6 @@ class Trainer_TokenGT(Trainer):
             # TODO ANKI [OBNOTE: ] - catch nan or inf
             # if torch.isnan(z.node_data).any() or torch.isinf(z.node_data).any():
             #    print("   nan or inf")
-            #    breakpoint()
             # TODO END ANKI
 
             pos_edge_index = self.prepare(t + 1)[0]
@@ -83,7 +82,7 @@ class Trainer_TokenGT(Trainer):
             # TODO END ANKI
             # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
             optimizer.step()
-            print(f"ET [lossbackward and step]: {time.time() - st:.8f}")
+            # print(f"ET [lossbackward and step]: {time.time() - st:.8f}")
             epoch_losses.append(loss.detach().item())
             # pbar.set_postfix(loss=f"{loss.detach().item():.4f}")
             # pbar.update(1)

@@ -13,6 +13,9 @@ from model_TokenGT.preprocess_raw_data import PreprocessBitcoinAlpha
 from util_hee import get_current_datetime
 from plot_graph_community_detection import PlotGraphMat
 
+# pre-logs
+args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.augment}_"
+
 
 # TODO ANKI [OBNOTE: ] - what is this?
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
@@ -48,10 +51,7 @@ args, data = load_data(args)
 data_to_prepare = copy.deepcopy(
     data["train"]
 )  # loss 계산 또는 auc 계산을 위한 원본 데이터 (edges), 즉, not augmented edges
-PlotGraphMat(args, args.dataset, data["train"]["pedges"])
-
-# pre-logs
-args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_"
+PlotGraphMat(args, args.dataset, data["train"]["pedges"], data["train"]["weights"])
 
 # init_logger(prepare_dir(log_dir) + "log.txt")
 
@@ -74,6 +74,10 @@ try:
         prepare_dir(args.log_dir)
     else:
         raise Exception("Unknown model: {}".format(args.model))
+
+    # get pytorch model's the number of parameters
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Number of parameters: {num_params}")
 
     info_dict = get_arg_dict(args)
     json.dump(info_dict, open(osp.join(args.log_dir, "info.json"), "w"))

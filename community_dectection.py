@@ -5,7 +5,7 @@ import networkx as nx
 
 
 class CommunityDetection:
-    def __init__(self, args, edge_tensor):
+    def __init__(self, args, edge_tensor, edge_weights):
         """
         Parameters
         ----------
@@ -14,7 +14,7 @@ class CommunityDetection:
         """
         self.args = args
         cgt = ConvertGraphTypes()
-        G = cgt.edge_tensor_to_networkx(edge_tensor)
+        G = cgt.edge_tensor_to_networkx(edge_tensor, edge_weights)
         self.version = args.model
         if self.version == "tokengt_cd":
             partition = self.louvain(G)

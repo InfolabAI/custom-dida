@@ -35,6 +35,10 @@ def tokengt_zhang_2022(args):
     args.encoder_ffn_embed_dim = 32
     args.encoder_layers = 2
     args.encoder_attention_heads = 2
+    # args.encoder_embed_dim = 768
+    # args.encoder_ffn_embed_dim = 768
+    # args.encoder_layers = 12
+    # args.encoder_attention_heads = 32
     # args.activation_fn = "relu"
     args.performer = True
     args.performer_finetune = True
@@ -257,7 +261,7 @@ class TokenGTModel(FairseqEncoderModel):
 
         logger.info(tokengt_args)
 
-        encoder = TokenGTEncoder(tokengt_args)
+        encoder = TokenGTEncoder(args, tokengt_args)
 
         return cls(args, tokengt_args, encoder, data_to_prepare)
 
@@ -267,92 +271,93 @@ class TokenGTModel(FairseqEncoderModel):
         st = time.time()
         data_handler, data_converter = get_data_converter(self.args)
         dc = data_converter(node_data, batched_data["mapping_from_orig_to_subgraphs"])
-        print(f"ET [DatasetConverter]: {time.time() - st:.8f}")
+        # print(f"ET [DatasetConverter]: {time.time() - st:.8f}")
         return dc
 
 
 class TokenGTEncoder(FairseqEncoder):
-    def __init__(self, args):
+    def __init__(self, dida_args, tokengt_args):
         super().__init__(dictionary=None)
-        assert not (args.prenorm and args.postnorm)
-        assert args.prenorm or args.postnorm
-        self.max_nodes = args.max_nodes
-        self.encoder_layers = args.encoder_layers
-        self.num_attention_heads = args.encoder_attention_heads
-        self.return_attention = args.return_attention
+        assert not (tokengt_args.prenorm and tokengt_args.postnorm)
+        assert tokengt_args.prenorm or tokengt_args.postnorm
+        self.max_nodes = tokengt_args.max_nodes
+        self.encoder_layers = tokengt_args.encoder_layers
+        self.num_attention_heads = tokengt_args.encoder_attention_heads
+        self.return_attention = tokengt_args.return_attention
 
-        if args.prenorm:
+        if tokengt_args.prenorm:
             layernorm_style = "prenorm"
-        elif args.postnorm:
+        elif tokengt_args.postnorm:
             layernorm_style = "postnorm"
         else:
             raise NotImplementedError
 
         self.graph_encoder = TokenGTGraphEncoder(
             # <
-            num_atoms=args.num_atoms,
-            num_in_degree=args.num_in_degree,
-            num_out_degree=args.num_out_degree,
-            num_edges=args.num_edges,
-            num_spatial=args.num_spatial,
-            num_edge_dis=args.num_edge_dis,
-            edge_type=args.edge_type,
-            multi_hop_max_dist=args.multi_hop_max_dist,
+            dida_args=dida_args,
+            num_atoms=tokengt_args.num_atoms,
+            num_in_degree=tokengt_args.num_in_degree,
+            num_out_degree=tokengt_args.num_out_degree,
+            num_edges=tokengt_args.num_edges,
+            num_spatial=tokengt_args.num_spatial,
+            num_edge_dis=tokengt_args.num_edge_dis,
+            edge_type=tokengt_args.edge_type,
+            multi_hop_max_dist=tokengt_args.multi_hop_max_dist,
             # >
             # < for tokenization
-            rand_node_id=args.rand_node_id,
-            rand_node_id_dim=args.rand_node_id_dim,
-            orf_node_id=args.orf_node_id,
-            orf_node_id_dim=args.orf_node_id_dim,
-            lap_node_id=args.lap_node_id,
-            lap_node_id_k=args.lap_node_id_k,
-            lap_node_id_sign_flip=args.lap_node_id_sign_flip,
-            lap_node_id_eig_dropout=args.lap_node_id_eig_dropout,
-            type_id=args.type_id,
+            rand_node_id=tokengt_args.rand_node_id,
+            rand_node_id_dim=tokengt_args.rand_node_id_dim,
+            orf_node_id=tokengt_args.orf_node_id,
+            orf_node_id_dim=tokengt_args.orf_node_id_dim,
+            lap_node_id=tokengt_args.lap_node_id,
+            lap_node_id_k=tokengt_args.lap_node_id_k,
+            lap_node_id_sign_flip=tokengt_args.lap_node_id_sign_flip,
+            lap_node_id_eig_dropout=tokengt_args.lap_node_id_eig_dropout,
+            type_id=tokengt_args.type_id,
             # >
             # <
-            stochastic_depth=args.stochastic_depth,
-            performer=args.performer,
-            performer_finetune=args.performer_finetune,
-            performer_nb_features=args.performer_nb_features,
-            performer_feature_redraw_interval=args.performer_feature_redraw_interval,
-            performer_generalized_attention=args.performer_generalized_attention,
-            num_encoder_layers=args.encoder_layers,
-            embedding_dim=args.encoder_embed_dim,
-            ffn_embedding_dim=args.encoder_ffn_embed_dim,
-            num_attention_heads=args.encoder_attention_heads,
-            dropout=args.dropout,
-            attention_dropout=args.attention_dropout,
-            activation_dropout=args.act_dropout,
-            encoder_normalize_before=args.encoder_normalize_before,
+            stochastic_depth=tokengt_args.stochastic_depth,
+            performer=tokengt_args.performer,
+            performer_finetune=tokengt_args.performer_finetune,
+            performer_nb_features=tokengt_args.performer_nb_features,
+            performer_feature_redraw_interval=tokengt_args.performer_feature_redraw_interval,
+            performer_generalized_attention=tokengt_args.performer_generalized_attention,
+            num_encoder_layers=tokengt_args.encoder_layers,
+            embedding_dim=tokengt_args.encoder_embed_dim,
+            ffn_embedding_dim=tokengt_args.encoder_ffn_embed_dim,
+            num_attention_heads=tokengt_args.encoder_attention_heads,
+            dropout=tokengt_args.dropout,
+            attention_dropout=tokengt_args.attention_dropout,
+            activation_dropout=tokengt_args.act_dropout,
+            encoder_normalize_before=tokengt_args.encoder_normalize_before,
             layernorm_style=layernorm_style,
-            apply_graphormer_init=args.apply_graphormer_init,
-            activation_fn=args.activation_fn,
-            return_attention=args.return_attention
+            apply_graphormer_init=tokengt_args.apply_graphormer_init,
+            activation_fn=tokengt_args.activation_fn,
+            return_attention=tokengt_args.return_attention
             # >
         )
 
-        self.share_input_output_embed = args.share_encoder_input_output_embed
+        self.share_input_output_embed = tokengt_args.share_encoder_input_output_embed
         self.embed_out = None
         self.lm_output_learned_bias = None
 
         # Remove head is set to true during fine-tuning
-        self.load_softmax = not getattr(args, "remove_head", False)
+        self.load_softmax = not getattr(tokengt_args, "remove_head", False)
         self.masked_lm_pooler = nn.Linear(
-            args.encoder_embed_dim, args.encoder_embed_dim
+            tokengt_args.encoder_embed_dim, tokengt_args.encoder_embed_dim
         )
         self.lm_head_transform_weight = nn.Linear(
-            args.encoder_embed_dim, args.encoder_embed_dim
+            tokengt_args.encoder_embed_dim, tokengt_args.encoder_embed_dim
         )
-        self.activation_fn = utils.get_activation_fn(args.activation_fn)
-        self.layer_norm = LayerNorm(args.encoder_embed_dim)
+        self.activation_fn = utils.get_activation_fn(tokengt_args.activation_fn)
+        self.layer_norm = LayerNorm(tokengt_args.encoder_embed_dim)
 
         self.lm_output_learned_bias = None
         if self.load_softmax:
             self.lm_output_learned_bias = nn.Parameter(torch.zeros(1))
             if not self.share_input_output_embed:
                 self.embed_out = nn.Linear(
-                    args.encoder_embed_dim, args.num_classes, bias=False
+                    tokengt_args.encoder_embed_dim, tokengt_args.num_classes, bias=False
                 )
             else:
                 raise NotImplementedError

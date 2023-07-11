@@ -1,11 +1,7 @@
 import os
-from symbol import shift_expr
-import numpy as np
 import torch
-from torch_geometric.utils import train_test_split_edges
-from torch_geometric.data import Data
-import pickle
 from .mutils import seed_everything
+from util_hee import remove_duplicated_edges
 
 
 def mkdirs(path):
@@ -162,4 +158,19 @@ def load_data(args, dataset=None):
     else:
         raise NotImplementedError(f"Unknown dataset {dataset}")
     print(f"Loading dataset {dataset}")
+    print(
+        f"Adding uniform edges features having the same shape of x in data to dataset {dataset}"
+    )
+
+    data["train"]["weights"] = []
+    for t, edge_tensor in enumerate(data["train"]["pedges"]):
+        edge_tensor = remove_duplicated_edges(edge_tensor)
+        weights_t = {}
+        for i, j in zip(edge_tensor[0], edge_tensor[1]):
+            weights_t[(int(i), int(j))] = 1.0
+            weights_t[(int(j), int(i))] = 1.0
+
+        data["train"]["weights"].append(weights_t)
+        data["train"]["pedges"][t] = edge_tensor
+
     return args, data

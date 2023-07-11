@@ -180,6 +180,7 @@ class TokenGTGraphEncoderLayer(nn.Module):
         modules similar to the original Transformer implementation.
         """
         # x: T x B x C
+        # print(f"x.shape in TokenGTGraphEncoderLayer {x.shape}")
         if self.layernorm_style == "prenorm":
             residual = x
             x = self.self_attn_layer_norm(x)
@@ -202,7 +203,6 @@ class TokenGTGraphEncoderLayer(nn.Module):
             # print(f"x_mean {x.mean([0, 1])}")
             # print(f"x_std {x.std([0, 1])}")
             # if torch.isnan(x).any():
-            #    breakpoint()
             #    print("   nan or inf")
             x = self.final_layer_norm(x)
             # print(list(self.final_layer_norm.named_parameters()))

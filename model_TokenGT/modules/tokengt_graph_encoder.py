@@ -15,6 +15,7 @@ from .multihead_attention import MultiheadAttention
 from .tokenizer import GraphFeatureTokenizer
 from .tokengt_graph_encoder_layer import TokenGTGraphEncoderLayer
 from hook import gradient_hook_for_tensor
+from subgraph_aware_layers.pooling_attention import PoolingAttention
 
 
 def init_graphormer_params(module):
@@ -44,6 +45,7 @@ def init_graphormer_params(module):
 class TokenGTGraphEncoder(nn.Module):
     def __init__(
         self,
+        dida_args,
         num_atoms: int,
         num_in_degree: int,
         num_out_degree: int,
@@ -90,6 +92,7 @@ class TokenGTGraphEncoder(nn.Module):
         return_attention: bool = False,
     ) -> None:
         super().__init__()
+        self.dida_args = dida_args
         self.dropout_module = FairseqDropout(
             dropout, module_name=self.__class__.__name__
         )
@@ -99,6 +102,12 @@ class TokenGTGraphEncoder(nn.Module):
         self.traceable = traceable
         self.performer = performer
         self.performer_finetune = performer_finetune
+        if dida_args.hidden_augment == "no":
+            pass
+        elif dida_args.hidden_augment == "pool":
+            self.hidden_augment = PoolingAttention(dida_args)
+        else:
+            raise NotImplementedError
 
         self.graph_feature = GraphFeatureTokenizer(
             num_atoms=num_atoms,
@@ -307,7 +316,7 @@ class TokenGTGraphEncoder(nn.Module):
 
         # account for padding while computing the representation
 
-        # B x T x C -> T x B x C
+        # B x T x C -> T x B x C: [seq_len(#tokens, i.e., #nodes + #edges + #additional tokens), batch_size(#subgraphs), hidden_size]
         x = x.transpose(0, 1)
 
         inner_states = []
@@ -326,6 +335,14 @@ class TokenGTGraphEncoder(nn.Module):
                 self_attn_mask=attn_mask,
                 self_attn_bias=None,
             )
+
+            if i < len(self.layers) - 1:
+                if self.dida_args.hidden_augment == "no":
+                    pass
+                else:
+                    print("hidden aug")
+                    x = self.hidden_augment(x)
+
             if not last_state_only:
                 inner_states.append(x)
             attn_dict["maps"][i] = attn
@@ -335,5 +352,5 @@ class TokenGTGraphEncoder(nn.Module):
         # TODO END ANKI
         # restore node_features (i.e., batched_data['node_data'])
         node_data = x.transpose(0, 1)[padded_node_mask, :]
-        print(f"ET [pure forward]: {time.time() - st:.8f}")
+        # print(f"ET [pure forward]: {time.time() - st:.8f}")
         return node_data

@@ -51,6 +51,12 @@ parser.add_argument(
     default="no",
     help="tiara | no",
 )
+parser.add_argument(
+    "--hidden_augment",
+    type=str,
+    default="no",
+    help="pool | no",
+)
 
 
 # 3.experiments

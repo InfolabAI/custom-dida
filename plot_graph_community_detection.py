@@ -11,7 +11,7 @@ import os
 
 
 class PlotGraphMat:
-    def __init__(self, args, dataset, edge_tensor_list):
+    def __init__(self, args, dataset, edge_tensor_list, edge_weight_list):
         """
         오직 plot 을 위한 class. 이 class 없이도 best_partition 을 수행하는 함수 따로 있으니 검색할 것.
         """
@@ -21,16 +21,18 @@ class PlotGraphMat:
 
         self.dataset = dataset
 
-        for time_t, edge_tensor in enumerate(edge_tensor_list):
+        for time_t, (edge_tensor, edge_weights) in enumerate(
+            zip(edge_tensor_list, edge_weight_list)
+        ):
             self.time_t = time_t
 
             if args.plot_graphs_community_detection == 1:
-                cd = CommunityDetection(args, edge_tensor)
+                cd = CommunityDetection(args, edge_tensor, edge_weights)
                 self.save_path = f"logs/graphs/{args.model}_{dataset}"
                 os.makedirs(self.save_path, exist_ok=True)
                 self.plot_nx_graph(cd.G, cd.partition, nx.spring_layout, k=0.05)
             elif args.plot_sparsity_mat_cd == 1:
-                cd = CommunityDetection(args, edge_tensor)
+                cd = CommunityDetection(args, edge_tensor, edge_weights)
                 self.save_path = f"logs/sparsity_mat/{args.model}_{dataset}"
                 # partition 번호: node 번호 로 변환
                 partition_to_node_dict = defaultdict(list)
@@ -47,7 +49,7 @@ class PlotGraphMat:
                     nodei_communitynodei[int(nodei.numpy())] = i
                 edge_tensor.apply_(lambda x: nodei_communitynodei[x])
                 # 변환한 edge tensor 로 G 다시 만들고 sparsity mat plot
-                cd = CommunityDetection(args, edge_tensor)
+                cd = CommunityDetection(args, edge_tensor, edge_weights)
                 os.makedirs(self.save_path, exist_ok=True)
                 self.plot_sparsity_mat(cd.G)
             else:
