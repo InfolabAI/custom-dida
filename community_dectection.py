@@ -5,7 +5,7 @@ import networkx as nx
 
 
 class CommunityDetection:
-    def __init__(self, args, edge_tensor, edge_weights):
+    def __init__(self, args, dglG, input_partition=None):
         """
         Parameters
         ----------
@@ -14,10 +14,15 @@ class CommunityDetection:
         """
         self.args = args
         cgt = ConvertGraphTypes()
-        G = cgt.edge_tensor_to_networkx(edge_tensor, edge_weights)
+        G = cgt.dgl_to_networkx(dglG.cpu())
+
+        # CD 속도 향상을 위해 edge 없는 node 정보 제거
+        isolates = list(nx.isolates(G))
+        G.remove_nodes_from(isolates)
+
         self.version = args.model
-        if self.version == "tokengt_cd":
-            partition = self.louvain(G)
+        if self.version == "tokengt_cd" or self.version == "ours":
+            partition = self.louvain(G, input_partition)
         elif self.version == "tokengt_cdrandom":
             partition = self.random(G)
             pass
@@ -45,16 +50,26 @@ class CommunityDetection:
 
         return partition
 
-    def louvain(self, G):
+    def louvain(self, G, input_partition):
         """
         Parameters
         ----------
         G : networkx graph
         """
+        # sync node indices between G and input_partition
+        if input_partition is not None:
+            # get indices in G that are not in input_partition
+            indices = np.setdiff1d(
+                np.array(list(G.nodes())), np.array(list(input_partition.keys()))
+            )
+            # partition 0 부터 차례대로 하나씩 넣어줌
+            for i in range(len(indices)):
+                input_partition[indices[i]] = i
+
         if self.args.dataset == "collab":
             # To save memory, use resolution=0.01, but, reduced memory is not enough (23.5G -> 17.5G)
             # partition = community_louvain.best_partition(G, resolution=0.01)
-            partition = community_louvain.best_partition(G)
+            partition = community_louvain.best_partition(G, partition=input_partition)
         else:
-            partition = community_louvain.best_partition(G)
+            partition = community_louvain.best_partition(G, partition=input_partition)
         return partition

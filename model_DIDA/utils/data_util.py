@@ -168,7 +168,7 @@ def load_data(args, dataset=None):
         weights_t = {}
         for i, j in zip(edge_tensor[0], edge_tensor[1]):
             weights_t[(int(i), int(j))] = 1.0
-            weights_t[(int(j), int(i))] = 1.0
+            # weights_t[(int(j), int(i))] = 1.0
 
         data["train"]["weights"].append(weights_t)
         data["train"]["pedges"][t] = edge_tensor

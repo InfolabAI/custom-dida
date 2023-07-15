@@ -57,6 +57,11 @@ parser.add_argument(
     default="no",
     help="pool | no",
 )
+parser.add_argument(
+    "--alpha_std",
+    type=int,
+    default=1,
+)
 
 
 # 3.experiments

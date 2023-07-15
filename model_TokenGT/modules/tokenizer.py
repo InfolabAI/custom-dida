@@ -282,7 +282,7 @@ class GraphFeatureTokenizer(nn.Module):
             padded_feature,
             padding_mask,
             padded_node_mask,
-            _,
+            padded_edge_mask,
         ) = self.get_batch(
             node_feature, edge_index, edge_feature, node_num, edge_num, perturb
         )
@@ -355,4 +355,5 @@ class GraphFeatureTokenizer(nn.Module):
             padding_mask,
             padded_index,
             padded_node_mask,
+            padded_edge_mask,
         )  # [B, 2+T, D], [B, 2+T], [B, T, 2]

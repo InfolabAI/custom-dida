@@ -269,6 +269,10 @@ class TokenGTModel(FairseqEncoderModel):
         # stem - nn.Linear(32, 16).to(batched_data['node_data'].device)(batched_data['node_data']).shape
         node_data = self.encoder(batched_data, **kwargs)
         st = time.time()
+        if "get_embedding" in kwargs:
+            if kwargs["get_embedding"]:
+                return node_data
+
         data_handler, data_converter = get_data_converter(self.args)
         dc = data_converter(node_data, batched_data["mapping_from_orig_to_subgraphs"])
         # print(f"ET [DatasetConverter]: {time.time() - st:.8f}")

@@ -13,6 +13,8 @@ def get_data_converter(args):
         return TokenGTDataset_noCD, DatasetConverter_noCD
     elif "tokengt_cd" in args.model:
         return TokenGTDataset_CD, DatasetConverter_CD
+    elif args.model == "ours":
+        return None, DatasetConverter_CD
     elif args.model == "dida":
         return None, None
     else:

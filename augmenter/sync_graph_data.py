@@ -4,47 +4,35 @@ from convert_graph_types import ConvertGraphTypes
 from tqdm import tqdm
 
 
-class Augmenter:
-    def __init__(self, data):
+class SyncGraphData:
+    def __init__(self, args, data):
         """
         Parameters
         --------
         data: dict of keys ['x', 'e', 'train', 'val', 'test'] where x means node features, e means edge features, and train, val, test means train, validation, test split.
+        sync_type: str, one of ['todgl', 'todict']
         """
+        if "dida" in args.model or "tokengt" in args.model:
+            self.sync_type = "todict"
+        elif "ours" in args.model:
+            self.sync_type = "todgl"
+        else:
+            raise NotImplementedError(f"args.model: {args.model}")
+
+        # convert dict to list of dgl graphs
         self.cgt = ConvertGraphTypes()
-        self.list_of_dgl_graphs = []
         self.data = data
-        num_nodes = self.data["x"].shape[0]
-        original_edge_tensors = self.data["train"][
-            "pedges"
-        ]  # original_edge_tensors: [[2, num_edges], ...]
-        original_edge_weights = self.data["train"][
-            "weights"
-        ]  # original_edge_tensors: [[2, num_edges], ...]
+        self.list_of_dgl_graphs = self.cgt.dict_to_list_of_dglG(data, args.device)
 
-        # tqdm with description
-        for edge_tensor, edge_weights in tqdm(
-            zip(original_edge_tensors, original_edge_weights),
-            desc="Converting the original edge tensors into DGL graphs...",
-        ):
-            nx_graph = self.cgt.edge_tensor_to_networkx(
-                edge_tensor, edge_weights, num_nodes
-            )
-            self.list_of_dgl_graphs.append(self.cgt.networkx_to_dgl(nx_graph))
+    def _sync(self, augmented_list_of_dgl_graphs):
+        if self.sync_type == "todgl":
+            return augmented_list_of_dgl_graphs
+        elif self.sync_type == "todict":
+            return self._dgl_graph_list_to_dict(augmented_list_of_dgl_graphs)
+        else:
+            raise NotImplementedError("sync_type must be one of ['todgl', 'todict']")
 
-    def __call__(self):
-        augmented_list_of_dgl_graphs = self._augment(self.list_of_dgl_graphs)
-        # remove self loop
-        augmented_list_of_dgl_graphs = [
-            dgl_graph.remove_self_loop() for dgl_graph in augmented_list_of_dgl_graphs
-        ]
-        for t, (G, augG) in enumerate(
-            zip(self.list_of_dgl_graphs, augmented_list_of_dgl_graphs)
-        ):
-            print(
-                f"#edges at t={t}: {G.edges()[0].shape[0]} -aug-> {augG.edges()[0].shape[0]} : diff+ {augG.edges()[0].shape[0] - G.edges()[0].shape[0]}"
-            )
-
+    def _dgl_graph_list_to_dict(self, augmented_list_of_dgl_graphs):
         list_of_augmented_edge_tensors = []
         list_of_augmented_edge_weights = []
         for dgl_graph in tqdm(
@@ -62,7 +50,21 @@ class Augmenter:
         self.data["train"]["pedges"] = list_of_augmented_edge_tensors
         self.data["train"]["edge_index_list"] = list_of_augmented_edge_tensors
         self.data["train"]["weights"] = list_of_augmented_edge_weights
-        return self.data
+        return self.data["train"]
+
+    def __call__(self):
+        augmented_list_of_dgl_graphs = self._augment(self.list_of_dgl_graphs)
+        # remove self loop
+        augmented_list_of_dgl_graphs = [
+            dgl_graph.remove_self_loop() for dgl_graph in augmented_list_of_dgl_graphs
+        ]
+        for t, (G, augG) in enumerate(
+            zip(self.list_of_dgl_graphs, augmented_list_of_dgl_graphs)
+        ):
+            print(
+                f"#edges at t={t}: {G.edges()[0].shape[0]} -aug-> {augG.edges()[0].shape[0]} : diff+ {augG.edges()[0].shape[0] - G.edges()[0].shape[0]}"
+            )
+        return self._sync(augmented_list_of_dgl_graphs)
 
     def filter_matrix(self, X, eps, normalize=True):
         assert eps < 1.0

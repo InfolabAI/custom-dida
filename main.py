@@ -14,7 +14,7 @@ from util_hee import get_current_datetime
 from plot_graph_community_detection import PlotGraphMat
 
 # pre-logs
-args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.augment}_"
+args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.augment}_{args.hidden_augment}_"
 
 
 # TODO ANKI [OBNOTE: ] - what is this?
@@ -59,6 +59,7 @@ PlotGraphMat(args, args.dataset, data["train"]["pedges"], data["train"]["weights
 from runner import Runner
 from model_DIDA.model import DGNN
 from model_TokenGT.model_tokengt import TokenGTModel
+from model_TokenGT.model_ours import OurModel
 
 try:
     if "tokengt" in args.model:
@@ -69,6 +70,14 @@ try:
         json.dump(
             tokengt_info_dict, open(osp.join(args.log_dir, "tokengt_info.json"), "w")
         )
+    elif args.model == "ours":
+        model = OurModel(args, data_to_prepare).to(args.device)
+        prepare_dir(args.log_dir)
+        tokengt_info_dict = get_arg_dict(model.tokengt_args)
+        json.dump(
+            tokengt_info_dict, open(osp.join(args.log_dir, "tokengt_info.json"), "w")
+        )
+
     elif args.model == "dida":
         model = DGNN(args, data_to_prepare).to(args.device)
         prepare_dir(args.log_dir)

@@ -1,12 +1,12 @@
 import torch, dgl
 import utils_TiaRa
 from tqdm import tqdm
-from augmenter.augmenter import Augmenter
+from augmenter.sync_graph_data import SyncGraphData
 
 
-class EdgePropagation(Augmenter):
+class EdgePropagation(SyncGraphData):
     def __init__(self, args, data, eps, device):
-        super().__init__(data)
+        super().__init__(args, data)
         self.args = args
         self.device = device
         self.discount_factor = 0.5
@@ -15,6 +15,7 @@ class EdgePropagation(Augmenter):
         print("current eps is fixed according to the dataset")
         if args.dataset == "collab":
             self.eps = 0.03
+            # self.eps = 0
         elif args.dataset == "yelp":
             self.eps = 0.2
         elif args.dataset == "bitcoin":
@@ -37,6 +38,7 @@ class EdgePropagation(Augmenter):
 
         for graph in tqdm(dataset[1:], desc="augmentation"):
             At_cur = graph.adj().to(torch.device(self.device))
+            breakpoint()
             At_cur = torch.sparse_coo_tensor(
                 At_cur.indices(), At_cur.val, At_cur.shape, device=At_cur.device
             )
@@ -54,3 +56,22 @@ class EdgePropagation(Augmenter):
             new_graphs.append(new_graph)
 
         return new_graphs
+
+
+"""
+At_cur 에서 gradient 유지한채로 edge_features (hidden_dim, edge_num) 으로 변환하는 법
+(Pdb) p (aa*At_cur).coalesce().values().broadcast_to(32, -1).t()
+tensor([[0.3333, 0.3333, 0.3333,  ..., 0.3333, 0.3333, 0.3333],
+        [1.0000, 1.0000, 1.0000,  ..., 1.0000, 1.0000, 1.0000],
+        [1.0000, 1.0000, 1.0000,  ..., 1.0000, 1.0000, 1.0000],
+        ...,
+        [0.1667, 0.1667, 0.1667,  ..., 0.1667, 0.1667, 0.1667],
+        [0.1667, 0.1667, 0.1667,  ..., 0.1667, 0.1667, 0.1667],
+        [0.3333, 0.3333, 0.3333,  ..., 0.3333, 0.3333, 0.3333]],
+       device='cuda:0', grad_fn=<TBackward0>)
+
+위 edge_features 에 sync 가 맞는 indices 를 구하는 방법
+(Pdb) p (aa*At_cur).coalesce().indices() 
+tensor([[    1,     1,     1,  ..., 23034, 23034, 23034],
+        [    1,    91,   885,  ...,  7654, 22813, 22886]], device='cuda:0')
+"""

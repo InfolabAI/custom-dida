@@ -11,7 +11,7 @@ class Flatten(nn.Module):
 class PoolingAttention(SubgraphAware):
     def __init__(self, dida_args):
         super().__init__(dida_args)
-        kernel_size = 9
+        kernel_size = 39
         embed_dim = 1
         reduction_ratio = 1
         # self.conv = nn.Sequential(
@@ -64,25 +64,10 @@ class PoolingAttention(SubgraphAware):
                 kernel_size=kernel_size,
                 padding=(kernel_size - 1) // 2,
             ),
-            # nn.Dropout(0.01),
             nn.ReLU(),
             nn.Conv2d(
                 embed_dim // reduction_ratio,
                 embed_dim // reduction_ratio,
-                kernel_size=kernel_size,
-                padding=(kernel_size - 1) // 2,
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                embed_dim // reduction_ratio,
-                embed_dim,
-                kernel_size=kernel_size,
-                padding=(kernel_size - 1) // 2,
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                embed_dim // reduction_ratio,
-                embed_dim,
                 kernel_size=kernel_size,
                 padding=(kernel_size - 1) // 2,
             ),

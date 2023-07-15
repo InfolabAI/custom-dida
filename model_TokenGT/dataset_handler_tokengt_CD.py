@@ -1,9 +1,9 @@
 # enhanced version of dataset_handler_tokengt.py
 # handle dataset with community detection to remove dupliacted nodes among subgraphs
 
-from typing import Any
 import torch
 import numpy as np
+import time
 from collections import defaultdict, Counter
 from community import community_louvain
 from community_dectection import CommunityDetection
@@ -175,7 +175,9 @@ class TokenGTDataset_CD(TokenGTDataset):
         cur_edge_data = self.generate_edge_data(
             cur_edges, cur_edge_weights, cur_x.shape[1]
         )
+        st = time.time()
         cd = CommunityDetection(self.args, cur_edges, cur_edge_weights)
+        print("CommunityDetection time: ", time.time() - st)
         partition = cd.partition
 
         print(f"THE NUMBER OF COMMUNITIES AT TIME {time_t}: {max(partition.values())}")

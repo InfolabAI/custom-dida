@@ -7,6 +7,7 @@ from loguru import logger
 
 SEED = None
 
+
 def fix_seed(seed):
     """Fix random seed"""
     global SEED
@@ -21,17 +22,20 @@ def fix_seed(seed):
         dgl.seed(seed)
         SEED = seed
 
+
 def sparse_eye(N, device):
     arr = torch.arange(N, device=device)
     indices = torch.stack([arr, arr])
     values = torch.ones_like(arr, dtype=torch.float)
     return torch.sparse_coo_tensor(indices, values, (N, N))
 
+
 def sparse_diag(input):
     N = input.shape[0]
     arr = torch.arange(N, device=input.device)
     indices = torch.stack([arr, arr])
     return torch.sparse_coo_tensor(indices, input, (N, N))
+
 
 def sparse_filter(input, eps):
     input = input.coalesce()
@@ -42,42 +46,50 @@ def sparse_filter(input, eps):
     values = values[idx]
     return torch.sparse_coo_tensor(indices, values)
 
+
 def graph_to_normalized_adjacency(graph):
     normalized_graph = dgl.GCNNorm()(graph.add_self_loop())
     adj = normalized_graph.adj(ctx=graph.device)
     new_adj = torch.sparse_coo_tensor(
-        adj.coalesce().indices(), normalized_graph.edata['w'], tuple(adj.shape)
+        adj.coalesce().indices(), normalized_graph.edata["w"], tuple(adj.shape)
     )
     return new_adj
 
-def weighted_adjacency_to_graph(adj):
+
+def weighted_adjacency_to_graph(adj, node_features=None):
     adj = adj.coalesce()
     indices = adj.indices()
     graph = dgl.graph((indices[0, :], indices[1, :]))
-    graph.edata['w'] = adj.values()
+    if node_features is not None:
+        graph.ndata["w"] = node_features
+        # [#edges] -> [#edges, hidden_dim]
+        graph.edata["w"] = adj.values().broadcast_to(node_features.shape[1], -1).t()
+    else:
+        graph.edata["w"] = adj.values()
     return graph
 
-def normalize_graph(graph, ord='sym'):
+
+def normalize_graph(graph, ord="sym"):
     adj = graph.adj(ctx=graph.device).coalesce()
 
-    if ord == 'row':
+    if ord == "row":
         norm = torch.sparse.sum(adj, dim=1).to_dense()
-        norm[norm<=0] = 1
+        norm[norm <= 0] = 1
         inv_D = sparse_diag(1 / norm)
         new_adj = inv_D @ adj
-    elif ord == 'col':
+    elif ord == "col":
         norm = torch.sparse.sum(adj, dim=0).to_dense()
-        norm[norm<=0] = 1
+        norm[norm <= 0] = 1
         inv_D = sparse_diag(1 / norm)
         new_adj = adj @ inv_D
-    elif ord == 'sym':
+    elif ord == "sym":
         norm = torch.sparse.sum(adj, dim=1).to_dense()
-        norm[norm<=0] = 1
+        norm[norm <= 0] = 1
         inv_D = sparse_diag(norm ** (-0.5))
         new_adj = inv_D @ adj @ inv_D
 
     new_adj = new_adj.coalesce()
     indices = new_adj.indices()
     new_graph = dgl.graph((indices[0, :], indices[1, :]))
-    new_graph.edata['w'] = new_adj.values()
+    new_graph.edata["w"] = new_adj.values()
     return new_graph

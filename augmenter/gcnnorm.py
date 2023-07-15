@@ -1,10 +1,10 @@
 import utils_TiaRa
-from augmenter.augmenter import Augmenter
+from augmenter.sync_graph_data import SyncGraphData
 
 
-class GCNNorm(Augmenter):
-    def __init__(self, data, device):
-        super().__init__(data)
+class GCNNorm(SyncGraphData):
+    def __init__(self, args, data, device):
+        super().__init__(args, data)
         self.device = device
 
     def _augment(self, dataset):

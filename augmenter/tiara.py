@@ -1,11 +1,11 @@
 import torch
 import utils_TiaRa
-from augmenter.augmenter import Augmenter
+from augmenter.sync_graph_data import SyncGraphData
 from tqdm.autonotebook import tqdm
 from loguru import logger
 
 
-class TiaRa(Augmenter):
+class TiaRa(SyncGraphData):
     """
     Approximate augmentation of temporal random walk diffusion
 
@@ -42,6 +42,7 @@ class TiaRa(Augmenter):
 
     def __init__(
         self,
+        args,
         data,
         alpha=0.2,
         beta=0.3,
@@ -57,7 +58,7 @@ class TiaRa(Augmenter):
         assert 0 <= alpha + beta and alpha + beta <= 1
         assert 0 < eps
 
-        super().__init__(data)
+        super().__init__(args, data)
 
         self.alpha = alpha
         self.beta = beta

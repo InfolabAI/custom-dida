@@ -297,9 +297,13 @@ class TokenGTGraphEncoder(nn.Module):
         if token_embeddings is not None:
             raise NotImplementedError
         else:
-            x, padding_mask, padded_index, padded_node_mask = self.graph_feature(
-                batched_data, perturb
-            )
+            (
+                x,
+                padding_mask,
+                padded_index,
+                padded_node_mask,
+                padded_edge_mask,
+            ) = self.graph_feature(batched_data, perturb)
 
         # x: B x T x C
 
@@ -351,6 +355,7 @@ class TokenGTGraphEncoder(nn.Module):
         # x.register_hook(gradient_hook_for_tensor)
         # TODO END ANKI
         # restore node_features (i.e., batched_data['node_data'])
+        # x: T x B x C -> B x T x C -> (node_num) x C
         node_data = x.transpose(0, 1)[padded_node_mask, :]
         # print(f"ET [pure forward]: {time.time() - st:.8f}")
         return node_data

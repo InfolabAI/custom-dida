@@ -8,6 +8,7 @@ import torch.optim as optim
 from model_DIDA.utils.mutils import *
 from augmenter.tiara import TiaRa
 from augmenter.edge_propagation import EdgePropagation
+from augmenter.normal import Normal
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -105,7 +106,8 @@ class Runner(object):
         max_train_auc = 0
 
         if self.args.augment == "no":
-            pass
+            aug = Normal(args, self.data)
+            self.data = aug()
         elif self.args.augment == "edgeprop":
             aug = EdgePropagation(
                 args,
@@ -114,9 +116,9 @@ class Runner(object):
                 device=f"cuda:{args.device_id}",
             )
             self.data = aug()
-
         elif self.args.augment == "tiara":
             aug = TiaRa(
+                args,
                 self.data,
                 alpha=0.2,
                 beta=0.3,
@@ -131,7 +133,7 @@ class Runner(object):
             raise NotImplementedError("augment not implemented")
 
         # complete checking shuffled data and not shuffled ori_data
-        data = self.model.trainer.preprocess_data_per_ex(self.x, self.data["train"])
+        data = self.model.trainer.preprocess_data_per_ex(self.x, self.data)
         ori_data = copy.deepcopy(data)
         with tqdm(range(1, args.max_epoch + 1)) as bar:
             for epoch in bar:
@@ -172,22 +174,17 @@ class Runner(object):
                     patience += 1
                     if epoch > min_epoch and patience > max_patience:
                         break
-                # if epoch == 1 or epoch % self.args.log_interval == 0:
-                print(
-                    "Epoch:{}, Loss: {:.4f}, Time: {:.3f}".format(
-                        epoch, average_epoch_loss, time.time() - t0
-                    )
+                bar.set_postfix(
+                    {
+                        "Epoch": epoch,
+                        "Loss": average_epoch_loss,
+                        "Time": time.time() - t0,
+                        "Train AUC": test_results[1],
+                        "Val AUC": test_results[2],
+                        "Test AUC": test_results[3],
+                    }
                 )
-                # print(
-                #    f"Current: Epoch:{epoch}, Train AUC:{average_train_auc:.4f}, Val AUC: {average_val_auc:.4f}, Test AUC: {average_test_auc:.4f}"
-                # )
 
-                # print(
-                #    f"Train: Epoch:{test_results[0]}, Train AUC:{max_train_auc:.4f}, Val AUC: {max_val_auc:.4f}, Test AUC: {max_test_auc:.4f}"
-                # )
-                print(
-                    f"Test: Epoch:{test_results[0]}, Train AUC:{test_results[1]:.4f}, Val AUC: {test_results[2]:.4f}, Test AUC: {test_results[3]:.4f}"
-                )
                 self.writer.add_scalar("Train AUC", test_results[1], epoch)
                 self.writer.add_scalar("Val AUC", test_results[2], epoch)
                 self.writer.add_scalar("Test AUC", test_results[3], epoch)
