@@ -71,7 +71,7 @@ try:
             tokengt_info_dict, open(osp.join(args.log_dir, "tokengt_info.json"), "w")
         )
     elif args.model == "ours":
-        model = OurModel(args, data_to_prepare).to(args.device)
+        model = OurModel(args, data_to_prepare, data["x"].shape[0]).to(args.device)
         prepare_dir(args.log_dir)
         tokengt_info_dict = get_arg_dict(model.tokengt_args)
         json.dump(

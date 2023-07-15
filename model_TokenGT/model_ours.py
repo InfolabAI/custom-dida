@@ -24,10 +24,10 @@ class MultiplyPredictor(torch.nn.Module):
 
 
 class Attention(nn.Module):
-    def __init__(self, dida_args, tokengt_args):
+    def __init__(self, dida_args, tokengt_args, num_nodes):
         super().__init__()
         self.stem = nn.Sequential(
-            nn.Linear(13095, 1),
+            nn.Linear(num_nodes, 1),
             nn.ReLU(),
         )
         # self.bn1 = nn.BatchNorm1d(tokengt_args.encoder_embed_dim)
@@ -135,13 +135,13 @@ class Attention(nn.Module):
 
 
 class OurModel(nn.Module):
-    def __init__(self, dida_args, data_to_prepare):
+    def __init__(self, dida_args, data_to_prepare, num_nodes):
         super().__init__()
         self.main_model = TokenGTModel.build_model(dida_args, data_to_prepare).to(
             dida_args.device
         )
         tokengt_args = self.main_model.tokengt_args
-        self.attention = Attention(dida_args, tokengt_args)
+        self.attention = Attention(dida_args, tokengt_args, num_nodes)
         self.cs_decoder = MultiplyPredictor()
 
         self.args = dida_args
@@ -165,11 +165,6 @@ class OurModel(nn.Module):
         action = self._get_action(self.embeddings, t)
         self.trainer.runnerProperty.writer.add_histogram(
             "action", action, self.total_step
-        )
-        self.trainer.runnerProperty.writer.add_embedding(
-            action,
-            global_step=self.total_step,
-            tag="action",
         )
         self.trainer.runnerProperty.writer.add_text(
             "action", str(action), self.total_step
