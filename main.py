@@ -14,7 +14,7 @@ from util_hee import get_current_datetime
 from plot_graph_community_detection import PlotGraphMat
 
 # pre-logs
-args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.augment}_{args.hidden_augment}_"
+args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.augment}_{args.hidden_augment}_{args.alpha_std}_"
 
 
 # TODO ANKI [OBNOTE: ] - what is this?

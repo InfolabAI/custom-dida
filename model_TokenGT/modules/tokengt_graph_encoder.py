@@ -107,7 +107,7 @@ class TokenGTGraphEncoder(nn.Module):
         elif dida_args.hidden_augment == "pool":
             self.hidden_augment = PoolingAttention(dida_args)
         else:
-            raise NotImplementedError
+            pass
 
         self.graph_feature = GraphFeatureTokenizer(
             num_atoms=num_atoms,
@@ -343,9 +343,11 @@ class TokenGTGraphEncoder(nn.Module):
             if i < len(self.layers) - 1:
                 if self.dida_args.hidden_augment == "no":
                     pass
-                else:
+                elif self.dida_args.hidden_augment == "pool":
                     print("hidden aug")
                     x = self.hidden_augment(x)
+                else:
+                    pass
 
             if not last_state_only:
                 inner_states.append(x)

@@ -54,8 +54,8 @@ parser.add_argument(
 parser.add_argument(
     "--hidden_augment",
     type=str,
-    default="no",
-    help="pool | no",
+    default="dyaug",
+    help="dyaug | pool | no",
 )
 parser.add_argument(
     "--alpha_std",

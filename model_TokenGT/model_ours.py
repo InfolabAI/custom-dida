@@ -26,6 +26,7 @@ class MultiplyPredictor(torch.nn.Module):
 class Attention(nn.Module):
     def __init__(self, dida_args, tokengt_args, num_nodes):
         super().__init__()
+        self.dida_args = dida_args
         self.stem = nn.Sequential(
             nn.Linear(num_nodes, 1),
             nn.ReLU(),
@@ -315,7 +316,7 @@ class OurModel(nn.Module):
 
     def forward(self, list_of_dgl_graphs, t, epoch, is_train):
         self.total_step += 1
-        if epoch == 11:
+        if epoch == 1 or self.args.hidden_augment == "dyaug":
             graph, partition = self._get_tr_input(list_of_dgl_graphs[t], t)
             return self.main_model(graph)
         else:
