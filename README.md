@@ -9,12 +9,12 @@
     ```shell
     pip install torch==2.0.1 --extra-index-url https://download.pytorch.org/whl/cu117
     ```
-- torch-geometric == 2.3.1 and torch-scatter == 2.1.1+pt20cu117
-    - Get appropriate `whl` files in [link](https://data.pyg.org/whl/) for `torch-scatter`, `torch-sparse`, `torch-cluster`, `torch-spline-conv`, and `torch-geometric`, then do this command
+- torch-geometric == 2.3.1  **and**  torch-scatter == 2.1.1+pt20cu117
+    - Get appropriate `whl` files in [link](https://data.pyg.org/whl/), then run following command
         ```shell
-        pip uninstall torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric
         pip install <scatter NAME>.whl # In this case, from https://data.pyg.org/whl/torch-2.0.1%2Bcu117.html
-        pip install <sparse NAME>.whl ...
+
+        pip install <geometric NAME>.whl ...
         ```
     - <font color=#cc0000>**Do not use**</font> `torch-scatter==2.1.1` because `<scatter 2.1.1 NAME>.whl` and `torch-scatter==2.1.1` are differet
 - dgl == 1.1.1+cu117
@@ -64,7 +64,7 @@
 
         # Check the logs in tensorboard
         ```
-- After running the project, if you want to group the results from multiple runs to get the mean values, run this code
+- After running the project, if you want to group the results from multiple runs to get the mean values, run following command
     ```bash
     # We assume that <LOG_PATH> has multiple runs with different seeds
     python group_multiple_runs.py <LOG_PATH>
