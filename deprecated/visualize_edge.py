@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 from collections import defaultdict
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+from loguru import logger
 
 HISTOGRAMS_DIR = "./logs/histograms/"
 
@@ -185,7 +186,7 @@ class VisualizeEdges:
         xvalue_to_yedgeid = np.array(xvalue_to_yedgeid)
 
         # set ticks
-        print(np.unique(xvalue_to_yedgeid[:, 0]))
+        logger.info(np.unique(xvalue_to_yedgeid[:, 0]))
         xticks = [x for x in range(np.unique(xvalue_to_yedgeid[:, 0]).max() + 1)]
         yticks = [x for x in range(len(edgedict))]
 

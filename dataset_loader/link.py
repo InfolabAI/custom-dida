@@ -4,7 +4,7 @@ import gzip, zipfile
 import time, dateutil.parser
 from loguru import logger
 from dataset_loader.template import DatasetTemplate
-from dataset_loader import utils
+from dataset_loader import utils_data
 from tqdm import tqdm
 
 
@@ -28,9 +28,11 @@ class LinkDatasetTemplate(DatasetTemplate):
 
         # generate temporal graphs
 
-        temporal_edges = utils.aggregate_by_time(self.raw_edges, self.time_aggregation)
+        temporal_edges = utils_data.aggregate_by_time(
+            self.raw_edges, self.time_aggregation
+        )
         undirected_raw_edges = [
-            utils.generate_undirected_edges(edges) for edges in temporal_edges
+            utils_data.generate_undirected_edges(edges) for edges in temporal_edges
         ]
         undirected_edges = [
             torch.tensor(
@@ -66,7 +68,7 @@ class LinkDatasetTemplate(DatasetTemplate):
                     continue
                 adj_list[edge["from"]].append(edge["to"])
             adj_lists.append(adj_list)
-            non_edges = utils.negative_sampling(adj_list)
+            non_edges = utils_data.negative_sampling(adj_list)
             non_edges = torch.tensor(
                 non_edges, dtype=torch.long, device=self.device
             ).reshape(-1, 2)

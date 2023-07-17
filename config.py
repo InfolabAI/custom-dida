@@ -1,61 +1,38 @@
 import argparse
 import torch
-import os
+from loguru import logger
+from utils_main import setargs
+
 
 parser = argparse.ArgumentParser()
-# 1.dataset
+# Transformer
+parser.add_argument("--encoder_embed_dim", type=int, default=32)
+parser.add_argument("--encoder_ffn_embed_dim", type=int, default=32)
+parser.add_argument("--encoder_layers", type=int, default=2)
+parser.add_argument("--encoder_attention_heads", type=int, default=2)
+
+# dataset
 parser.add_argument("--dataset", type=str, default="collab", help="datasets")
 parser.add_argument("--num_nodes", type=int, default=-1, help="num of nodes")
 parser.add_argument("--nfeat", type=int, default=128, help="dim of input feature")
-# TODO ANKI [OBNOTE: data shuffle] - add args
-parser.add_argument(
-    "--shuffled",
-    type=int,
-    default=0,
-    help="if this option is 1, the time stamps are shuffled",
-)
-# TODO END ANKI
-# TODO ANKI [OBNOTE: plot] - add args for plot
 parser.add_argument(
     "--plot",
     type=int,
     default=0,
     help="if this option is 1, the stats of datasets are plotted",
 )
-# TODO END ANKI
 
-# 2-0.plot
-parser.add_argument(
-    "--plot_hub_nodes",
-    type=int,
-    default=0,
-    help="if this option is 1, the stats based on hub nodes are plotted",
-)
-parser.add_argument(
-    "--plot_graphs_community_detection",
-    type=int,
-    default=0,
-    help="if this option is 1, the graphs based on community detection are drawed",
-)
-parser.add_argument(
-    "--plot_sparsity_mat_cd",
-    type=int,
-    default=0,
-    help="if this option is 1, the sparsity of adj matrix based on community detection are drawed",
-)
+# plot
+# parser.add_argument( "--plot_hub_nodes", type=int, default=0, help="if this option is 1, the stats based on hub nodes are plotted",)
+# parser.add_argument( "--plot_graphs_community_detection", type=int, default=0, help="if this option is 1, the graphs based on community detection are drawed",)
+# parser.add_argument( "--plot_sparsity_mat_cd", type=int, default=0, help="if this option is 1, the sparsity of adj matrix based on community detection are drawed",)
 
-# 2-1. augmentation
+# augmentation
 parser.add_argument(
-    "--augment",
-    type=str,
-    default="no",
-    help="tiara | no",
-)
-parser.add_argument(
-    "--hidden_augment",
+    "--propagate",
     type=str,
     default="dyaug",
-    help="dyaug | pool | no",
+    help="dyaug | no",
 )
 parser.add_argument(
     "--alpha_std",
@@ -64,7 +41,7 @@ parser.add_argument(
 )
 
 
-# 3.experiments
+# experiments
 parser.add_argument(
     "--model", type=str, help="tokengt_nocd | tokengt_cd | tokengt_cdrandom | dida"
 )
@@ -95,7 +72,7 @@ parser.add_argument("--n_layers", type=int, default=2)
 parser.add_argument("--heads", type=int, default=4, help="attention heads.")  # 4
 parser.add_argument("--norm", type=int, default=1)
 parser.add_argument("--skip", type=int, default=0, help="")  # 1
-parser.add_argument("--dropout", type=float, default=0.0, help="dropout rate ")
+parser.add_argument("--dropout_dida", type=float, default=0.0, help="dropout rate ")
 parser.add_argument("--use_RTE", type=int, default=1, help="")
 parser.add_argument("--n_intervene", type=int, default=1000, help="")
 parser.add_argument("--la_intervene", type=float, default=0.01)
@@ -120,15 +97,10 @@ args = parser.parse_args()
 # set the running device
 if int(args.device_id) >= 0 and torch.cuda.is_available():
     args.device = torch.device("cuda:{}".format(args.device_id))
-    print("using gpu:{} to train the model".format(args.device_id))
+    logger.info("using gpu:{} to train the model".format(args.device_id))
 else:
     args.device = torch.device("cpu")
-    print("using cpu to train the model")
-
-
-def setargs(args, hp):
-    for k, v in hp.items():
-        setattr(args, k, v)
+    logger.info("using cpu to train the model")
 
 
 if args.use_cfg:
@@ -138,7 +110,7 @@ if args.use_cfg:
             "heads": 4,
             "norm": 1,
             "skip": 0,
-            "dropout": 0.0,
+            "dropout_dida": 0.0,
             "use_RTE": 1,
             "n_intervene": 1000,
             "la_intervene": 0.01,
@@ -152,7 +124,7 @@ if args.use_cfg:
             "heads": 4,
             "norm": 1,
             "skip": 0,
-            "dropout": 0.0,
+            "dropout_dida": 0.0,
             "use_RTE": 1,
             "n_intervene": 1000,
             "la_intervene": 0.01,
@@ -166,7 +138,7 @@ if args.use_cfg:
             "heads": 2,
             "norm": 1,
             "skip": 1,
-            "dropout": 0.0,
+            "dropout_dida": 0.0,
             "use_RTE": 1,
             "n_intervene": 1000,
             "la_intervene": 0.1,
@@ -180,7 +152,7 @@ if args.use_cfg:
             "heads": 4,
             "norm": 1,
             "skip": 0,
-            "dropout": 0.0,
+            "dropout_dida": 0.0,
             "use_RTE": 1,
             "n_intervene": 1000,
             "la_intervene": 0.01,

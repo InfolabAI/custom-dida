@@ -1,7 +1,8 @@
 import os
+import random
 import torch
-from .mutils import seed_everything
-from util_hee import remove_duplicated_edges
+from loguru import logger
+from utils_main import remove_duplicated_edges, seed_everything
 
 
 def mkdirs(path):
@@ -16,45 +17,13 @@ def prepare_dir(output_folder):
     return log_folder
 
 
-def select_by_field(edges, fields=[0, 1]):
-    # field [0,1,2,3,4]
-    res = []
-    for f in fields:
-        e = edges[edges[:, 4] == f]
-        res.append(e)
-    edges = torch.cat(res, dim=0)
-    res = []
-    for i in range(16):
-        e = edges[edges[:, 2] == i]
-        e = e[:, :2]
-        res.append(e)
-    edges = res
-    return edges
-
-
-def select_by_venue(edges, venues=[0, 1]):
-    # venue [0-21]
-    res = []
-    for f in venues:
-        e = edges[edges[:, 3] == f]
-        res.append(e)
-    edges = torch.cat(res, dim=0)
-    res = []
-    for i in range(16):
-        e = edges[edges[:, 2] == i]
-        e = e[:, :2]
-        res.append(e)
-    edges = res
-    return edges
-
-
 def load_data(args, dataset=None):
     seed_everything(0)
     if dataset is None:
         dataset = args.dataset
 
     if dataset == "collab":
-        from ..data_configs.collab import (
+        from dataset_loader.collab import (
             testlength,
             vallength,
             length,
@@ -72,7 +41,7 @@ def load_data(args, dataset=None):
         args.num_nodes = len(data["x"])
 
     elif dataset == "yelp":
-        from ..data_configs.yelp import (
+        from dataset_loader.yelp import (
             testlength,
             vallength,
             length,
@@ -94,7 +63,7 @@ def load_data(args, dataset=None):
         args.num_nodes = len(data["x"])
 
     elif "synthetic" in dataset:
-        from ..data_configs.synthetic import (
+        from dataset_loader.synthetic import (
             testlength,
             vallength,
             synthetic_file,
@@ -120,7 +89,7 @@ def load_data(args, dataset=None):
         args.length = len(data["x"])
 
     elif "bitcoin" == dataset:
-        from preprocess_dict_from_dgl import PreprocessDictFromDGL
+        from dataset_loader.preprocess_dict_from_dgl import PreprocessDictFromDGL
 
         data = PreprocessDictFromDGL(
             "raw_data/BitcoinAlpha", "data/BitcoinAlpha"
@@ -133,7 +102,7 @@ def load_data(args, dataset=None):
         args.num_nodes = len(data["x"])
 
     elif "redditbody" == dataset:
-        from preprocess_dict_from_dgl import PreprocessDictFromDGL
+        from dataset_loader.preprocess_dict_from_dgl import PreprocessDictFromDGL
 
         data = PreprocessDictFromDGL(
             "raw_data/RedditBody", "data/RedditBody"
@@ -146,7 +115,7 @@ def load_data(args, dataset=None):
         args.num_nodes = len(data["x"])
 
     elif "wikielec" == dataset:
-        from preprocess_dict_from_dgl import PreprocessDictFromDGL
+        from dataset_loader.preprocess_dict_from_dgl import PreprocessDictFromDGL
 
         data = PreprocessDictFromDGL("raw_data/WikiElec", "data/WikiElec").graph_dict
         args.dataset = dataset
@@ -157,8 +126,8 @@ def load_data(args, dataset=None):
         args.num_nodes = len(data["x"])
     else:
         raise NotImplementedError(f"Unknown dataset {dataset}")
-    print(f"Loading dataset {dataset}")
-    print(
+    logger.info(f"Loading dataset {dataset}")
+    logger.info(
         f"Adding uniform edges features having the same shape of x in data to dataset {dataset}"
     )
 
@@ -174,3 +143,122 @@ def load_data(args, dataset=None):
         data["train"]["pedges"][t] = edge_tensor
 
     return args, data
+
+
+def aggregate_by_time(raw_edges, time_aggregation):
+    """
+    Parameters
+    ----------
+    raw_edges
+        list of the edges
+    time_aggregation
+        time step size in seconds
+
+    Returns
+    -------
+    list of edges in the single time step
+    """
+    times = [int(re["time"] // time_aggregation) for re in raw_edges]
+
+    min_time, max_time = min(times), max(times)
+    times = [t - min_time for t in times]
+    time_steps = max_time - min_time + 1
+    seperated_edges = [[] for _ in range(time_steps)]
+
+    for i, edge in enumerate(raw_edges):
+        t = times[i]
+        seperated_edges[t].append(edge)
+
+    return seperated_edges
+
+
+# this function guarantees unique edges
+# use latest edge in single time step
+def generate_undirected_edges(directed_edges):
+    """
+    Parameters
+    ----------
+    directed_edges
+        directional edges
+
+    Returns
+    -------
+    undirectional edges
+    """
+
+    edges_dict = {}
+    for edge in directed_edges:
+        e = (edge["from"], edge["to"])
+        wt = edges_dict.get(e)
+
+        if wt:
+            _, t = wt
+            if edge["time"] > t:
+                edges_dict[e] = edge["weight"], edge["time"]
+        else:
+            edges_dict[e] = edge["weight"], edge["time"]
+
+    undirected_edges = []
+    for edge in edges_dict:
+        if (edge[1], edge[0]) in edges_dict:
+            if edge[0] > edge[1]:
+                continue
+
+            weight1, time1 = edges_dict[edge]
+            weight2, time2 = edges_dict[(edge[1], edge[0])]
+
+            weight = weight1 if time1 >= time2 else weight2
+
+            undirected_edges.append(
+                {
+                    "from": edge[0],
+                    "to": edge[1],
+                    "weight": weight,
+                    "original": time1 >= time2,
+                }
+            )
+            undirected_edges.append(
+                {
+                    "from": edge[1],
+                    "to": edge[0],
+                    "weight": weight,
+                    "original": time1 < time2,
+                }
+            )
+
+        else:
+            weight, _ = edges_dict[edge]
+            undirected_edges.append(
+                {"from": edge[0], "to": edge[1], "weight": weight, "original": True}
+            )
+            undirected_edges.append(
+                {"from": edge[1], "to": edge[0], "weight": weight, "original": False}
+            )
+
+    return undirected_edges
+
+
+def negative_sampling(adj_list):
+    """
+    Parameters
+    ----------
+    adj_list
+        directed adjacency list on single time step
+
+    Returns
+    -------
+    sampled undirected non_edge list from given adjacency list
+    """
+    num_nodes = len(adj_list)
+    non_edges = []
+
+    for node, neighbors in enumerate(adj_list):
+        neg_dests = []
+        while len(neg_dests) < len(neighbors):
+            dest = random.randint(0, num_nodes - 1)
+            if dest in [node] + neighbors + neg_dests:
+                continue
+            neg_dests.append(dest)
+            non_edges.append([node, dest])
+
+    return non_edges + [non_edge[::-1] for non_edge in non_edges]

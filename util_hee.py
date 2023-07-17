@@ -14,9 +14,9 @@ def remove_duplicated_edges(edges):
         edges (tensor): [2, #edges]
     """
     # duplicated edges are [src1, dst1] and [dst1, src1], so we sort them and remove the duplicated ones
-    # TODO ANKI [OBNOTE: ] - For example, a duplicated edge is [src1, dst1] and [dst1, src1], so we sort them and remove the duplicated ones
     # edges (tensor): [2, #edges]
     original_edge_num = edges.shape[1]
+    breakpoint()
     edges = (torch.sort(edges, dim=0)[0]).unique(dim=1)
     remove_dup_edge_num = edges.shape[1]
     edges = edges[:, edges[0] != edges[1]]
@@ -25,5 +25,3 @@ def remove_duplicated_edges(edges):
         f"Remove duplicated edges: {original_edge_num - remove_dup_edge_num} and self-loop edges: {remove_dup_edge_num - remove_self_loop}"
     )
     return edges
-
-    # TODO END ANKI

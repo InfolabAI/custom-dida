@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from community_dectection import CommunityDetection
-from plot_sparsity_adjmat import plot_sparsity_pattern
+from deprecated.plot_sparsity_adjmat import plot_sparsity_pattern
 from community import community_louvain
 from collections import defaultdict
 import os

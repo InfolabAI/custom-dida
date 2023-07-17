@@ -2,10 +2,11 @@
 Modified from https://github.com/microsoft/Graphormer
 """
 
-from typing import Callable, Optional
 
 import torch
 import torch.nn as nn
+from typing import Callable, Optional
+from loguru import logger
 from fairseq.modules import LayerNorm
 from fairseq.modules.fairseq_dropout import FairseqDropout
 
@@ -171,7 +172,7 @@ class TokenGTGraphEncoderLayer(nn.Module):
         modules similar to the original Transformer implementation.
         """
         # x: T x B x C
-        # print(f"x.shape in TokenGTGraphEncoderLayer {x.shape}")
+        # logger.info(f"x.shape in TokenGTGraphEncoderLayer {x.shape}")
         if self.layernorm_style == "prenorm":
             residual = x
             x = self.self_attn_layer_norm(x)

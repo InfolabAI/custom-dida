@@ -1,20 +1,13 @@
-from trainer import Trainer
-from torch_geometric.utils import negative_sampling
-from model_DIDA.utils.mutils import *
-from tqdm import tqdm
-from plot_based_on_hub_nodes import PlotBasedOnHubNodes
+from trainer_and_tester import TrainerAndTester
+from utils_main import *
 
 
-class Tester_DIDA(Trainer):
+class Tester_DIDA(TrainerAndTester):
     def __init__(self, args, model, data_to_prepare):
         super().__init__(args, model, data_to_prepare)
 
     def test(self, epoch, data):
         # plot init
-        plot_ = PlotBasedOnHubNodes(
-            self.args, data, self.model.cs_decoder, self.runnerProperty.writer, epoch
-        )
-
         args = self.args
 
         train_auc_list = []
@@ -41,9 +34,6 @@ class Tester_DIDA(Trainer):
                 val_auc_list.append(auc)
             else:
                 test_auc_list.append(auc)
-            plot_.process_t(z, t)
-
-        plot_.process_epoch(epoch)
 
         return [
             epoch,

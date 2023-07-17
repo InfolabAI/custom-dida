@@ -1,9 +1,23 @@
-import math
 import torch, dgl
 import os, shutil, wget
-from utils_TiaRa import fix_seed
-from dataset_loader import utils
+import random
+import numpy as np
 from loguru import logger
+
+
+def fix_seed(seed):
+    """Fix random seed"""
+    global SEED
+    if SEED is None and seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        dgl.seed(seed)
+        SEED = seed
 
 
 class DatasetTemplate(dgl.data.DGLDataset):
@@ -97,9 +111,9 @@ class DatasetTemplate(dgl.data.DGLDataset):
     def download(self):
         temp = "{}/.{}".format(self.raw_path, self.raw_file_name)
         dst = "{}/{}".format(self.raw_path, self.raw_file_name)
-        print("downloading {}...".format(self.name))
+        logger.info("downloading {}...".format(self.name))
         wget.download(self.url, out=temp)
-        print("\ndone")
+        logger.info("\ndone")
         shutil.move(temp, dst)
 
     def process(self):

@@ -88,12 +88,10 @@ class TokenGTDataset_noCD(TokenGTDataset):
             pool_edges = np.setdiff1d(pool_edges, subedges)
             yield cur_edges[:, subedges], cur_edge_data[subedges]
 
-        # TODO ANKI [OBNOTE: ] - # pool_edges 의 길이가 sameple_num_edge 로 정확히 나누어 떨어지면 pool_edges 길이가 0일 수 있으므로 예외처리
         if pool_edges.shape[0] != 0:
             # pool_edges 의 길이가 sameple_num_edge 로 정확히 나누어 떨어지면 pool_edges 길이가 0일 수 있으므로 예외처리
             # yield the remaining subedges
             yield cur_edges[:, pool_edges], cur_edge_data[pool_edges]
-            # TODO END ANKI
 
     def generate_subgraphs_with_edges(self, cur_edges, cur_edge_data, cur_x):
         # generate subgraphs
@@ -136,11 +134,10 @@ class TokenGTDataset_noCD(TokenGTDataset):
             node_num += [len(indices_subnodes)]
             edge_num += [subedges.shape[1]]
             # convert each whole graph node index in subedges into the subgraph node index
-            # TODO ANKI [OBNOTE: ] - torch.tensor.apply_ is the function like map() in Python
             edge_index += [
                 subedges.apply_(lambda x: mapping_dict_for_edges_in_a_subgraph[x])
             ]
-            # TODO END ANKI
+
             total_indices_subnodes_with_edges += indices_subnodes
 
         node_data = torch.concat(node_data, dim=0).to(self.device)

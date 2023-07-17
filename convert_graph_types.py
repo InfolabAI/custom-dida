@@ -2,6 +2,7 @@ import networkx as nx
 import dgl
 import numpy as np
 import torch
+from loguru import logger
 from time import time
 from collections import defaultdict
 
@@ -39,10 +40,6 @@ class ConvertGraphTypes:
 
         >>> # networkx 그래프를 edge tensor로 변환
         >>> edge_tensor = networkx_to_edge_tensor(nx_graph)
-
-        >>> # edge tensor 정보 출력
-        >>> print(edge_tensor.shape)
-        >>> print(edge_tensor)
         """
         # networkx 그래프의 엣지 정보를 가져옵니다
         edge_list = list(nx_graph.edges())
@@ -83,10 +80,6 @@ class ConvertGraphTypes:
 
         >>> # edge tensor를 그래프로 변환
         >>> graph = edge_tensor_to_graph(edge_tensor)
-
-        >>> # 그래프 정보 출력
-        >>> print("Nodes:", graph.nodes)
-        >>> print("Edges:", graph.edges)
         """
         # edge_tensor의 shape과 데이터를 확인합니다
         num_edges = edge_tensor.shape[1]
@@ -170,7 +163,7 @@ class ConvertGraphTypes:
         remained_nodes = np.arange(dglG.num_nodes())
         node_data_index = 0
         mapping_from_orig_to_subgraphs = {}
-        # print(">" * 10, "time for converting partition:", time() - st)
+        # logger.info(">" * 10, "time for converting partition:", time() - st)
 
         st = time()
         # extract subgraphs with edge
@@ -181,7 +174,7 @@ class ConvertGraphTypes:
             for i in indices_subnodes:
                 mapping_from_orig_to_subgraphs[i] = [node_data_index]
                 node_data_index += 1
-        # print(">" * 10, "time for extracting subgraphs with edge:", time() - st)
+        # logger.info(">" * 10, "time for extracting subgraphs with edge:", time() - st)
 
         st = time()
         # extract subgraphs without edge
@@ -192,7 +185,7 @@ class ConvertGraphTypes:
             for i in indices_subnodes:
                 mapping_from_orig_to_subgraphs[i] = [node_data_index]
                 node_data_index += 1
-        # print(">" * 10, "time for extracting subgraphs without edge:", time() - st)
+        # logger.info(">" * 10, "time for extracting subgraphs without edge:", time() - st)
 
         st = time()
         a_graph_at_t = defaultdict(list)
@@ -206,13 +199,13 @@ class ConvertGraphTypes:
                 a_graph_at_t["edge_index"].append(edge_tensor)
             a_graph_at_t["node_num"].append(subgraph.num_nodes())
             a_graph_at_t["edge_num"].append(subgraph.num_edges())
-        # print(">" * 10, "time for making a_graph_at_t:", time() - st)
+        # logger.info(">" * 10, "time for making a_graph_at_t:", time() - st)
 
         st = time()
         a_graph_at_t["node_data"] = torch.concat(a_graph_at_t["node_data"])
         a_graph_at_t["edge_data"] = torch.concat(a_graph_at_t["edge_data"])
         a_graph_at_t["edge_index"] = torch.concat(a_graph_at_t["edge_index"], dim=1)
-        # print(">" * 10, "concat time:", time() - st)
+        # logger.info(">" * 10, "concat time:", time() - st)
         a_graph_at_t["mapping_from_orig_to_subgraphs"] = mapping_from_orig_to_subgraphs
 
         return a_graph_at_t
@@ -237,6 +230,7 @@ class ConvertGraphTypes:
         # [#edges] -> [#edges, hidden_dim]
         graph.edata["w"] = adj.values().broadcast_to(node_features.shape[1], -1).t()
 
+        # TODO remove duplicated edges like [i,j] and [j,i]
         graph = graph.remove_self_loop()
         graph.remove_edges(indices_to_be_removed)
 

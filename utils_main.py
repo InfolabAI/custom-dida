@@ -1,6 +1,34 @@
+import os
+import torch
 import random
 import numpy as np
 import torch
+from loguru import logger
+from datetime import datetime
+
+
+def get_current_datetime():
+    now = datetime.now()
+    formatted_date = now.strftime("%Y-%m-%d %H:%M")
+    return formatted_date
+
+
+def remove_duplicated_edges(edges):
+    """
+    Args:
+        edges (tensor): [2, #edges]
+    """
+    # duplicated edges are [src1, dst1] and [dst1, src1], so we sort them and remove the duplicated ones
+    # edges (tensor): [2, #edges]
+    original_edge_num = edges.shape[1]
+    edges = (torch.sort(edges, dim=0)[0]).unique(dim=1)
+    remove_dup_edge_num = edges.shape[1]
+    edges = edges[:, edges[0] != edges[1]]
+    remove_self_loop = edges.shape[1]
+    logger.info(
+        f"Remove duplicated edges: {original_edge_num - remove_dup_edge_num} and self-loop edges: {remove_dup_edge_num - remove_self_loop}"
+    )
+    return edges
 
 
 def seed_everything(seed: int):
@@ -16,12 +44,6 @@ def seed_everything(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
-import shutil
-from torch.utils.tensorboard import SummaryWriter
-import json
-import os.path as osp
-
-
 def get_arg_dict(args):
     info_dict = args.__dict__
     ks = list(info_dict.keys())
@@ -35,84 +57,24 @@ def get_arg_dict(args):
     return arg_dict
 
 
-class EarlyStopping:
-    """EarlyStopping class to keep NN from overfitting. copied from nni"""
-
-    def __init__(self, mode="min", min_delta=0, patience=10, percentage=False):
-        self.mode = mode
-        self.min_delta = min_delta
-        self.patience = patience
-        self.best = None
-        self.num_bad_epochs = 0
-        self.is_better = None
-        self._init_is_better(mode, min_delta, percentage)
-
-        if patience == 0:
-            self.is_better = lambda a, b: True
-            self.step = lambda a: False
-
-    def step(self, metrics):
-        """EarlyStopping step on each epoch
-        @params metrics: metric value
-        @return : True if stop
-        """
-
-        if self.best is None:
-            self.best = metrics
-            return False
-
-        if np.isnan(metrics):
-            return True
-
-        if self.is_better(metrics, self.best):
-            self.num_bad_epochs = 0
-            self.best = metrics
-        else:
-            self.num_bad_epochs += 1
-
-        if self.num_bad_epochs >= self.patience:
-            return True
-
-        return False
-
-    def reset(self):
-        self.best = None
-
-    def _init_is_better(self, mode, min_delta, percentage):
-        if mode not in {"min", "max"}:
-            raise ValueError("mode " + mode + " is unknown!")
-        if not percentage:
-            if mode == "min":
-                self.is_better = lambda a, best: a < best - min_delta
-            if mode == "max":
-                self.is_better = lambda a, best: a > best + min_delta
-        else:
-            if mode == "min":
-                self.is_better = lambda a, best: a < best - (best * min_delta / 100)
-            if mode == "max":
-                self.is_better = lambda a, best: a > best + (best * min_delta / 100)
+def setargs(args, hp):
+    for k, v in hp.items():
+        setattr(args, k, v)
 
 
-def is_empty_edges(edges):
-    return edges.shape[1] == 0
-
-
-def map2id(l):
-    """encode list (unique) starting from 0.
-    @return : mapping dict from l -> int.
+def merge_namespaces(namespace1, namespace2):
     """
-    return dict(zip(l, range(len(l))))
+    Update namespace1 with items from namespace2."""
+    dict_namespace1 = vars(namespace1)
+    dict_namespace2 = vars(namespace2)
+    for key in set(dict_namespace1.keys()).intersection(set(dict_namespace2.keys())):
+        logger.warning(
+            f"While merging namespaces, for {key}, {dict_namespace1[key]} is replaced by {dict_namespace2[key]}"
+        )
+    dict_namespace1.update(dict_namespace2)
+    setargs(namespace1, dict_namespace1)
 
-
-def sorteddict(x, min=True, dim=1):
-    """return dict sorted by values
-    @params x: a dict
-    @params min : whether from small to large.
-    """
-    if min:
-        return dict(sorted(x.items(), key=lambda item: item[dim]))
-    else:
-        return dict(sorted(x.items(), key=lambda item: item[dim])[::-1])
+    return namespace1
 
 
 from gensim.models import Word2Vec
@@ -128,18 +90,18 @@ def sen2vec(sentences, vector_size=32):
     """
     sentences = [list(gensim.utils.tokenize(a, lower=True)) for a in sentences]
     model = Word2Vec(sentences, vector_size=vector_size, min_count=1)
-    print("word2vec done")
+    logger.info("word2vec done")
     embs = []
     for s in sentences:
         try:
             emb = model.wv[s]
             emb = np.mean(emb, axis=0)
         except Exception as e:
-            print(e)
+            logger.info(e)
             emb = np.zeros(vector_size)
         embs.append(emb)
     embs = np.stack(embs)
-    print(f"emb shape : {embs.shape}")
+    logger.info(f"emb shape : {embs.shape}")
     return embs
 
 

@@ -320,26 +320,6 @@ class GraphFeatureTokenizer(nn.Module):
             )  # [B, T, 2Do]
             padded_feature = padded_feature + self.orf_encoder(orf_index_embed)
 
-        if self.lap_node_id:
-            lap_dim = lap_eigvec.size(-1)
-            if self.lap_node_id_k > lap_dim:
-                eigvec = F.pad(
-                    lap_eigvec, (0, self.lap_node_id_k - lap_dim), value=float("0")
-                )  # [sum(n_node), Dl]
-            else:
-                eigvec = lap_eigvec[:, : self.lap_node_id_k]  # [sum(n_node), Dl]
-            if self.lap_eig_dropout is not None:
-                eigvec = self.lap_eig_dropout(eigvec[..., None, None]).view(
-                    eigvec.size()
-                )
-            lap_node_id = self.handle_eigvec(
-                eigvec, node_mask, self.lap_node_id_sign_flip
-            )
-            lap_index_embed = self.get_index_embed(
-                lap_node_id, node_mask, padded_index
-            )  # [B, T, 2Dl]
-            padded_feature = padded_feature + self.lap_encoder(lap_index_embed)
-
         if self.type_id:
             padded_feature = padded_feature + self.get_type_embed(padded_index)
 

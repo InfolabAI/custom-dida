@@ -165,11 +165,9 @@ class TokenGTDataset_CD(TokenGTDataset):
         (Pdb) p cur_x.shape
             torch.Size([23035, 32]) # [#nodes, dim of a node feature]
         """
-        # TODO ANKI [OBNOTE: ] -  partition idea 정리
         # TODO idea: train edge 들만 가지고 partition 을 만들어야 정확하다고 생각됨
         # TODO 반대 idea: 어차피 t+1 때의 edge 를 맞추는 것이기 때문에, t 때의 edge 들로 partition 을 만들어도 상관없음
-        # TODO END ANKI
-        cur_edges = remove_duplicated_edges(self.data["pedges"][time_t].long())
+                cur_edges = remove_duplicated_edges(self.data["pedges"][time_t].long())
         cur_x = self.x[time_t]
         cur_edge_weights = self.data["weights"][time_t]
         cur_edge_data = self.generate_edge_data(

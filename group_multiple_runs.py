@@ -1,11 +1,12 @@
 import os
 import sys
-from collections import defaultdict
 import numpy as np
+import shutil
+from collections import defaultdict
 from torch.utils.tensorboard import SummaryWriter
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
-import shutil
 from tqdm import tqdm
+from loguru import logger
 
 
 class GroupMultipleRuns:
@@ -59,7 +60,7 @@ class GroupMultipleRuns:
         os.makedirs(dpath, exist_ok=True)
         writer = SummaryWriter(dpath)
         tags, tag_values = zip(*d_combined.items())
-        print(
+        logger.info(
             "WARNING: Steps (x-axis) of current function starts from 1. You may need to start from 0."
         )
         for tag, values in tqdm(zip(tags, tag_values), desc="writing combined events"):

@@ -270,7 +270,7 @@ class DGNN(nn.Module):
                 hid_dim,
                 n_heads=n_heads,
                 norm=norm,
-                dropout=args.dropout,
+                dropout=args.dropout_dida,
                 skip=args.skip,
                 use_RTE=args.use_RTE,
                 sample_r=0.1,

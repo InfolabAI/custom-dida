@@ -1,45 +1,36 @@
-from trainer import Trainer
+from trainer_and_tester import TrainerAndTester
 from torch_geometric.utils import negative_sampling
-from model_DIDA.utils.mutils import *
-from hook import gradient_hook, forward_hook
+from utils_main import *
 import time
 from tqdm import tqdm
 
 
-class Trainer_TokenGT(Trainer):
+class TrainerOurs(TrainerAndTester):
     def __init__(self, args, model, data_to_prepare):
         super().__init__(args, model, data_to_prepare)
+        self.total_step = 0  # For writer
         pass
 
     def train(self, epoch, data):
+        """
+        Parameters
+        ----------
+        We assume that data is a list of dgl graphs
+        """
         super().train(data)
-        if self.runnerProperty == None:
-            raise Exception("You need to set setRunnerProperty first.")
+        assert self.runnerProperty != None, "You need to do setRunnerProperty first."
 
         args = self.runnerProperty.args
         self.model.train()
         optimizer = self.runnerProperty.optimizer
 
-        # 모든 레이어에 register hook 설정
-        # for module in self.model.modules():
-        #    module.register_backward_hook(gradient_hook)
-        #    module.register_forward_hook(forward_hook)
-
-        # train
         edge_index = []
         edge_label = []
         epoch_losses = []
-        ## edge label construction
-        # with tqdm(total=self.runnerProperty.len_train - 1) as pbar:
-        for t in range(self.runnerProperty.len_train - 1):
-            # print(f"t = {t}")
-            # pbar.set_description(f"Processing item {t}")
-
-            batch = data[t]
-            z = self.model(batch)
-            # catch nan and inf
-            # if torch.isnan(z.node_data).any() or torch.isinf(z.node_data).any():
-            #    print("   nan or inf")
+        for t in tqdm(
+            range(self.runnerProperty.len_train - 1), desc="Training", leave=False
+        ):
+            z = self.model(data, t, epoch, is_train=True)
 
             pos_edge_index = self.prepare(t + 1)[0]
             if args.dataset == "yelp":
@@ -68,22 +59,14 @@ class Trainer_TokenGT(Trainer):
             st = time.time()
             optimizer.zero_grad()
             loss.backward()
-            # grad_fn = loss.grad_fn
-            # while grad_fn is not None:
-            #    print(grad_fn)
-            #    grad_fn = (
-            #        grad_fn.next_functions[0][0] if grad_fn.next_functions else None
-            #    )
-
             # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
             optimizer.step()
-            # print(f"ET [lossbackward and step]: {time.time() - st:.8f}")
             epoch_losses.append(loss.detach().item())
-            # pbar.set_postfix(loss=f"{loss.detach().item():.4f}")
-            # pbar.update(1)
-            # print(loss)
-            # torch.autograd.set_detect_anomaly(True)
+            for name, param in self.model.named_parameters():
+                self.runnerProperty.writer.add_histogram(name, param, self.total_step)
+            self.total_step += 1
 
         average_epoch_loss = np.array(epoch_losses).mean()
+        self.runnerProperty.writer.add_scalar("epoch_loss", loss.detach().cpu(), epoch)
 
         return average_epoch_loss, [], [], []

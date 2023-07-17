@@ -23,7 +23,6 @@ def forward_hook(module, input_, output_):
             break
 
 
-# TODO ANKI [OBNOTE: ] - 역전파 과정에서 그래디언트 확인을 위한 hook 함수
 # 역전파 과정에서 그래디언트 확인을 위한 hook 함수
 def gradient_hook(module, grad_input, grad_output):
     print(module)  # 해당 모듈 출력
@@ -42,14 +41,11 @@ def gradient_hook(module, grad_input, grad_output):
                 breakpoint()
                 print("   nan or inf")
     print()
-    # TODO END ANKI
 
 
-# TODO ANKI [OBNOTE: ] - tensor hook
 def gradient_hook_for_tensor(grad):
     if grad is not None:
         print(f"x hook: {grad.shape}, mean: {grad.mean()}, std: {grad.std()}")
         if torch.isnan(grad).any():
             breakpoint()
             print("   nan or inf")
-            # TODO END ANKI

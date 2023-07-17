@@ -1,18 +1,17 @@
-from trainer import Trainer
+from trainer_and_tester import TrainerAndTester
 from torch_geometric.utils import negative_sampling
-from model_DIDA.utils.mutils import *
+from utils_main import *
 from tqdm import tqdm
 
 
-class Trainer_DIDA(Trainer):
+class Trainer_DIDA(TrainerAndTester):
     def __init__(self, args, model, data_to_prepare):
         super().__init__(args, model, data_to_prepare)
         pass
 
     def train(self, epoch, data):
         super().train(data)
-        if self.runnerProperty == None:
-            raise Exception("You need to set setRunnerProperty first.")
+        assert self.runnerProperty != None, "You need to do setRunnerProperty first."
 
         args = self.runnerProperty.args
         self.model.train()

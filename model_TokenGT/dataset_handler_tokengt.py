@@ -23,12 +23,10 @@ class TokenGTDataset(torch.utils.data.Dataset):
         for t in range(self.max_time):
             self.converted_data_list += [self.convert_to_tokengt_input(t)]
 
-    # TODO ANKI [OBNOTE: ] -
     def generate_subgraphs_with_no_edges(
         self, cur_x, total_indices_subnodes_with_edges
     ):
         # To caluculate the loss, we need all the nodes including nodes with no edges.
-        # TODO END ANKI
 
         indices_nodes_with_no_edge = np.setdiff1d(
             np.arange(cur_x.shape[0]), total_indices_subnodes_with_edges

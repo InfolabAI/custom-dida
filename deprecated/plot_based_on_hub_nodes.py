@@ -1,10 +1,9 @@
 import torch
 import numpy as np
-import time
-from sklearn.metrics import average_precision_score, accuracy_score
+from sklearn.metrics import accuracy_score
 from collections import defaultdict
-from plot_parent import Plot
-from torch.utils.tensorboard import SummaryWriter
+from deprecated.plot_parent import Plot
+from loguru import logger
 
 
 class PlotBasedOnHubNodes(Plot):
@@ -17,7 +16,7 @@ class PlotBasedOnHubNodes(Plot):
         if self.args.plot_hub_nodes == 0:
             return
 
-        print(f"plot time {time_t}")
+        logger.info(f"plot time {time_t}")
         edges = self.data["pedges"][time_t].long().to(self.args.device)
         graph = self.get_graph_dict(self.data["pedges"][time_t])
         node_degree = self.get_node_degree_dict(self.data["pedges"][time_t])
@@ -28,7 +27,7 @@ class PlotBasedOnHubNodes(Plot):
         if self.args.plot_hub_nodes == 0:
             return
 
-        print(f"plot epoch {epoch}")
+        logger.info(f"plot epoch {epoch}")
         self.plot_node_degree_acc_scalar(epoch)
 
     def get_graph_dict(self, edges: torch.Tensor) -> dict:
@@ -61,7 +60,7 @@ class PlotBasedOnHubNodes(Plot):
         node_degree = defaultdict(list)
         unique, degree = edges.unique(return_counts=True)
         # sorted_indices = torch.argsort(degree, descending=True)
-                for i in range(len(unique)):
+        for i in range(len(unique)):
             node_degree[int(degree[i].numpy())].append(int(unique[i].numpy()))
 
         node_degree = dict(
