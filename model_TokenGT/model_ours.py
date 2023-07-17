@@ -167,9 +167,10 @@ class OurModel(nn.Module):
         self.trainer.runnerProperty.writer.add_histogram(
             "action", action, self.total_step
         )
-        self.trainer.runnerProperty.writer.add_text(
-            "action", str(action), self.total_step
-        )
+        if self.total_step == 0 or self.total_step % 100 == 0:
+            self.trainer.runnerProperty.writer.add_text(
+                "action", str(action), self.total_step
+            )
         # NOTE [::-1] reversed indices to sync this to action
         sublist_of_dgl_graphs = list_of_dgl_graphs[:t][::-1]
         cur_graph = list_of_dgl_graphs[t]
@@ -223,6 +224,9 @@ class OurModel(nn.Module):
         self.trainer.runnerProperty.writer.add_scalar(
             "with partition", 1 if partition is not None else 0, self.total_step
         )
+        # print(
+        #    f"comunity detection time: {time() - st} with partition {partition is not None}"
+        # )
         st = time()
         a_graph_at_t = self.cgt.dglG_to_TrInputDict(
             dglG.to(self.args.device), cd.partition

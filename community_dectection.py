@@ -1,7 +1,8 @@
-from community import community_louvain
-from convert_graph_types import ConvertGraphTypes
+import torch
 import numpy as np
 import networkx as nx
+from community import community_louvain
+from convert_graph_types import ConvertGraphTypes
 
 
 class CommunityDetection:
@@ -13,6 +14,11 @@ class CommunityDetection:
         edge_tensor : [2, num_edges]
         """
         self.args = args
+        input_partition = self.sync_partition_with_dglG(dglG, input_partition)
+        if input_partition is not None:
+            self.partition = input_partition
+            return
+
         cgt = ConvertGraphTypes()
         G = cgt.dgl_to_networkx(dglG.cpu())
 
@@ -32,6 +38,21 @@ class CommunityDetection:
             raise NotImplementedError("Community detection version is not implemented.")
         self.G = G
         self.partition = partition
+
+    def sync_partition_with_dglG(self, dglG, input_partition):
+        # sync node indices between G and input_partition
+        if input_partition is not None:
+            dglG_tensor = dglG.adj().indices().flatten().unique()
+            part_tensor = torch.tensor(list(input_partition.keys())).to(
+                dglG_tensor.device
+            )
+            # get indices in G that are not in input_partition
+            indices = dglG_tensor[torch.isin(dglG_tensor, part_tensor, invert=True)]
+            # partition 0 부터 차례대로 하나씩 넣어줌
+            for i in range(len(indices)):
+                input_partition[int(indices[i].cpu())] = i
+
+        return input_partition
 
     def random(self, G):
         """
@@ -56,16 +77,6 @@ class CommunityDetection:
         ----------
         G : networkx graph
         """
-        # sync node indices between G and input_partition
-        if input_partition is not None:
-            # get indices in G that are not in input_partition
-            indices = np.setdiff1d(
-                np.array(list(G.nodes())), np.array(list(input_partition.keys()))
-            )
-            # partition 0 부터 차례대로 하나씩 넣어줌
-            for i in range(len(indices)):
-                input_partition[indices[i]] = i
-
         if self.args.dataset == "collab":
             # To save memory, use resolution=0.01, but, reduced memory is not enough (23.5G -> 17.5G)
             # partition = community_louvain.best_partition(G, resolution=0.01)

@@ -5,6 +5,7 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 import shutil
+from tqdm import tqdm
 
 
 class GroupMultipleRuns:
@@ -42,9 +43,15 @@ class GroupMultipleRuns:
         for it in summary_iterators:
             assert it.Tags()["scalars"] == tags
         out = defaultdict(list)
-        for tag in tags:
+        for tag in tqdm(tags, desc="tabulating events"):
             for events in zip(*[acc.Scalars(tag) for acc in summary_iterators]):
-                assert len(set(e.step for e in events)) == 1
+                if len(set(e.step for e in events)) != 1:
+                    # step 이 sync 가 맞지 않아 평균을 구할 수 없는 상황이면 버림
+                    try:
+                        del out[tag]
+                    except:
+                        pass
+                    break
                 out[tag].append([e.value for e in events])
         return out
 
@@ -55,7 +62,7 @@ class GroupMultipleRuns:
         print(
             "WARNING: Steps (x-axis) of current function starts from 1. You may need to start from 0."
         )
-        for tag, values in zip(tags, tag_values):
+        for tag, values in tqdm(zip(tags, tag_values), desc="writing combined events"):
             # drop a run which is the most outlier. (100, 3) -> (100, 2) without outlier
             indices = np.argsort(np.array(values).mean(axis=0))[1:]
             means = np.array(values)[:, indices].mean(axis=-1)
