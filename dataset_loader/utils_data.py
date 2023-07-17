@@ -141,6 +141,7 @@ def load_data(args, dataset=None):
 
         data["train"]["weights"].append(weights_t)
         data["train"]["pedges"][t] = edge_tensor
+        data["train"]["edge_index_list"] = data["train"]["pedges"]
 
     return args, data
 

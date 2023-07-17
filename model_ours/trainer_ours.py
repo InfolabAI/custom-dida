@@ -62,8 +62,11 @@ class TrainerOurs(TrainerAndTester):
             # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
             optimizer.step()
             epoch_losses.append(loss.detach().item())
-            for name, param in self.model.named_parameters():
-                self.runnerProperty.writer.add_histogram(name, param, self.total_step)
+            if self.args.plot_parameter_distribution == 1:
+                for name, param in self.model.named_parameters():
+                    self.runnerProperty.writer.add_histogram(
+                        name, param, self.total_step
+                    )
             self.total_step += 1
 
         average_epoch_loss = np.array(epoch_losses).mean()

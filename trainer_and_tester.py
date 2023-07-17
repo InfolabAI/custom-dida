@@ -20,7 +20,7 @@ class TrainerAndTester:
             self.cgt = ConvertGraphTypes()
             data = self.cgt.dict_to_list_of_dglG(data, self.args.device)
         elif self.args.model == "dida":
-            pass
+            data = data["train"]
         else:
             raise NotImplementedError(f"args.model: {self.args.model}")
 

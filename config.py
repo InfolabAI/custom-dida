@@ -23,6 +23,12 @@ parser.add_argument(
 )
 
 # plot
+parser.add_argument(
+    "--plot_parameter_distribution",
+    type=int,
+    default=0,
+    help="if this option is 1, the distribution of parameters are plotted in Tensorboard",
+)
 # parser.add_argument( "--plot_hub_nodes", type=int, default=0, help="if this option is 1, the stats based on hub nodes are plotted",)
 # parser.add_argument( "--plot_graphs_community_detection", type=int, default=0, help="if this option is 1, the graphs based on community detection are drawed",)
 # parser.add_argument( "--plot_sparsity_mat_cd", type=int, default=0, help="if this option is 1, the sparsity of adj matrix based on community detection are drawed",)
