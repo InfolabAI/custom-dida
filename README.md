@@ -32,7 +32,7 @@
 
 ## Datasets
 - COLLAB and Yelp
-    - Download dataset at ./data from following links
+    - Download dataset at `./data` from following links
         ```bash
         https://drive.google.com/file/d/19SOqzYEKvkna6DKd74gcJ50Wd4phOHr3/view?usp=share_link
         ```
@@ -44,14 +44,32 @@
         ```
 
 ## Usage
+- Check args.log_dir in `config.py`
 - Run the project
+    - **Option 1** - Use `main.py` directly, for example:
+        ```bash
+        # Our method with edge propagation with alpha_std
+        python main.py --model ours --seed 123 --device_id 0 --propagate dyaug --alpha_std 1 --dataset collab --ex_name "Dynamic aug"
+
+        # DIDA
+        python main.py --model dida --seed 123 --device_id 0 --dataset collab --ex_name "Dynamic aug"
+        ```
+    - **Option 2** - Use `script.sh`
+        ```bash
+        bash script.sh
+        # Then, check the log folder <args.log_dir>/<args.ex_name>/* for this run
+
+        # To check logs, move the log folder to <TENSORBOARD FOLDER> and run tensorboard
+        tensorboard --logdir <TENSORBOARD FOLDER> --port <PORT>
+
+        # Check the logs in tensorboard
+        ```
+- After running the project, if you want to group the results from multiple runs to get the mean values, run this code
     ```bash
-    bash script.sh
-    ```
-- After running the project, group multiple runs to get the mean values of multiple runs
-    ```bash
+    # We assume that <LOG_PATH> has multiple runs with different seeds
     python group_multiple_runs.py <LOG_PATH>
-    # check <LOG_PATH>/combined_<EACH RUN>
+
+    # Check <LOG_PATH>/combined_<RUN NAME>
     ```
 
 ## Paper
