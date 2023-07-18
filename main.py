@@ -11,6 +11,11 @@ from torch.utils.tensorboard import SummaryWriter
 from utils_main import get_current_datetime
 from dataset_loader.utils_data import load_data, prepare_dir
 
+logger.remove()
+logger.add(sink=sys.stdout, level=args.loguru_level)
+logger.info("Start")
+logger.debug("DUBUG Start")
+
 # prepare log path
 args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.propagate}_{args.alpha_std}_"
 
@@ -36,9 +41,8 @@ json.dump(info_dict, open(os.path.join(args.log_dir, "tokengt_info.json"), "w"))
 logger.add(
     os.path.join(args.log_dir, "log.log"),
     format="{time}:{file}:{function}:{level}:{message}",
-    level="INFO",
+    level="DEBUG",
 )
-logger.info("Start")
 
 # get the number of model's parameters
 num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

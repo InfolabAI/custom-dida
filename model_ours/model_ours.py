@@ -193,6 +193,18 @@ class OurModel(nn.Module):
         self.embeddings = embeddings
 
     def _get_tr_input(self, dglG, t):
+        dglG = dglG.to(self.args.device)
+        if self.args.use_subgraph:
+            graph_dict, partition = self._get_subgraphs_dict_and_partition(dglG, t)
+        else:
+            graph_dict, partition = self._get_graph_dict(dglG)
+        return graph_dict, partition
+
+    def _get_graph_dict(self, dglG):
+        a_graph_at_t = self.cgt.dglG_to_TrInputDict_NoSubgraphs(dglG)
+        return a_graph_at_t, None
+
+    def _get_subgraphs_dict_and_partition(self, dglG, t):
         if self.partition_dict is not None:
             partition = self.partition_dict[t]
         else:
@@ -210,9 +222,7 @@ class OurModel(nn.Module):
         #    f"comunity detection time: {time() - st} with partition {partition is not None}"
         # )
         st = time()
-        a_graph_at_t = self.cgt.dglG_to_TrInputDict(
-            dglG.to(self.args.device), cd.partition
-        )
+        a_graph_at_t = self.cgt.dglG_to_TrInputDict(dglG, cd.partition)
         self.trainer.runnerProperty.writer.add_scalar(
             "dgltotrinput time", time() - st, self.total_step
         )
@@ -304,10 +314,14 @@ class OurModel(nn.Module):
         self.total_step += 1
         if epoch == 1 or self.args.propagate != "dyaug":
             graph, partition = self._get_tr_input(list_of_dgl_graphs[t], t)
-            return self.main_model(graph)
+            st = time()
+            embedding = self.main_model(graph)
+            logger.debug(f"main_model time: {time() - st}")
+            return embedding
         else:
             if t == 0 and is_train:
                 self._get_graph_embeddings(list_of_dgl_graphs, epoch)
             augG = self._get_augmented_graph(list_of_dgl_graphs, t)
             graph, partition = self._get_tr_input(augG, t)
-            return self.main_model(graph)
+            embedding = self.main_model(graph)
+            return embedding

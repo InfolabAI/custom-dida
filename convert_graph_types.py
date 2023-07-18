@@ -130,6 +130,21 @@ class ConvertGraphTypes:
 
         return list_of_dgl_graphs
 
+    def dglG_to_TrInputDict_NoSubgraphs(self, dglG):
+        a_graph_at_t = defaultdict(list)
+        a_graph_at_t["node_data"] = dglG.ndata["w"]
+        a_graph_at_t["edge_data"] = dglG.edata["w"]
+        edge_tensor = torch.concat(
+            [dglG.edges()[0].unsqueeze(0), dglG.edges()[1].unsqueeze(0)]
+        )
+        a_graph_at_t["edge_index"] = edge_tensor
+        a_graph_at_t["node_num"].append(dglG.num_nodes())
+        a_graph_at_t["edge_num"].append(dglG.num_edges())
+        a_graph_at_t["mapping_from_orig_to_subgraphs"] = {
+            k: [k] for k in range(dglG.num_nodes())
+        }
+        return a_graph_at_t
+
     def dglG_to_TrInputDict(self, dglG, partition, maxnum_communities=5):
         """
         Parameters
