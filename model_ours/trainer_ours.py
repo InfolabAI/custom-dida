@@ -1,7 +1,7 @@
+import time
 from trainer_and_tester import TrainerAndTester
 from torch_geometric.utils import negative_sampling
 from utils_main import *
-import time
 from tqdm import tqdm
 
 
@@ -67,6 +67,9 @@ class TrainerOurs(TrainerAndTester):
                     self.runnerProperty.writer.add_histogram(
                         name, param, self.total_step
                     )
+            logger.debug(f"GPU usage: {get_gpu_memory_usage(self.args.device_id)} MiB")
+            if self.total_step == 1:
+                exit()
             self.total_step += 1
 
         average_epoch_loss = np.array(epoch_losses).mean()

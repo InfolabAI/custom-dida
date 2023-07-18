@@ -145,62 +145,29 @@ class ConvertGraphTypes:
         }
         return a_graph_at_t
 
-    def dglG_to_TrInputDict(self, dglG, partition, maxnum_communities=5):
+    def dglG_to_TrInputDict(self, dglG, comm_group):
         """
         Parameters
         --------
         dglG: dgl.graph
-        partition: dict: {nodeid: partition_id} from Community detection
+        comm_group: dict: {partition_id: [node_index, ...]}
         """
         st = time()
-        # convert partition to {partition_id: [nodeid1, nodeid2, ...]}
-        new_partition = defaultdict(list)
-        for nodeid, partition_id in partition.items():
-            new_partition[partition_id] += [nodeid]
-
-        # restrict the number of communities
-        tmp_partition = {}
-        for i in range(maxnum_communities):
-            tmp_partition[i] = []
-        for com_id, node_list in dict(
-            sorted(new_partition.items(), key=lambda x: len(x[1]), reverse=True)
-        ).items():
-            minlen_idx = np.argmin(np.array([len(x) for x in tmp_partition.values()]))
-            tmp_partition[minlen_idx] += node_list
-        new_partition = tmp_partition
-
-        # set maxnum_nodes_per_subgraph
-        maxnum_nodes_per_subgraph = np.array(
-            [len(x) for x in tmp_partition.values()]
-        ).max()
 
         subgraph_list = []
-        remained_nodes = np.arange(dglG.num_nodes())
         node_data_index = 0
         mapping_from_orig_to_subgraphs = {}
         # logger.info(">" * 10, "time for converting partition:", time() - st)
 
         st = time()
         # extract subgraphs with edge
-        for partition_id, indices_subnodes in new_partition.items():
+        for partition_id, indices_subnodes in comm_group.items():
             subgraph = dgl.node_subgraph(dglG, indices_subnodes)
-            remained_nodes = np.setdiff1d(remained_nodes, indices_subnodes)
             subgraph_list.append(subgraph)
             for i in indices_subnodes:
                 mapping_from_orig_to_subgraphs[i] = [node_data_index]
                 node_data_index += 1
         # logger.info(">" * 10, "time for extracting subgraphs with edge:", time() - st)
-
-        st = time()
-        # extract subgraphs without edge
-        for idx in range(0, len(remained_nodes), maxnum_nodes_per_subgraph):
-            indices_subnodes = remained_nodes[idx : idx + maxnum_nodes_per_subgraph]
-            subgraph = dgl.node_subgraph(dglG, indices_subnodes)
-            subgraph_list.append(subgraph)
-            for i in indices_subnodes:
-                mapping_from_orig_to_subgraphs[i] = [node_data_index]
-                node_data_index += 1
-        # logger.info(">" * 10, "time for extracting subgraphs without edge:", time() - st)
 
         st = time()
         a_graph_at_t = defaultdict(list)
@@ -245,8 +212,9 @@ class ConvertGraphTypes:
         # [#edges] -> [#edges, hidden_dim]
         graph.edata["w"] = adj.values().broadcast_to(node_features.shape[1], -1).t()
 
-        # TODO remove duplicated edges like [i,j] and [j,i]
         graph = graph.remove_self_loop()
         graph.remove_edges(indices_to_be_removed)
+        # we do not use removing parallel edges like [i,j] and [j,i] because it may remove the gradient
+        # graph = dgl.to_simple(graph)
 
         return graph

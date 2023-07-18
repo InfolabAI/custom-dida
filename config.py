@@ -11,9 +11,9 @@ parser.add_argument("--encoder_ffn_embed_dim", type=int, default=32)
 parser.add_argument("--encoder_layers", type=int, default=2)
 parser.add_argument("--encoder_attention_heads", type=int, default=2)
 parser.add_argument(
-    "--use_subgraph",
+    "--dont_use_subgraph",
     action="store_true",
-    help="If you don't input '--use_subgraph', the model won't use subgraph",
+    help="If you input '--dont_use_subgraph', the model doesn't use subgraph",
 )
 
 
@@ -21,13 +21,21 @@ parser.add_argument(
 parser.add_argument("--dataset", type=str, default="collab", help="datasets")
 parser.add_argument("--num_nodes", type=int, default=-1, help="num of nodes")
 parser.add_argument("--nfeat", type=int, default=128, help="dim of input feature")
+parser.add_argument(
+    "--comm_alg",
+    type=str,
+    default="louvain",
+    help="louvain | random",
+)
+parser.add_argument("--minnum_nodes_for_a_community", type=int, default=100)
+parser.add_argument("--num_comm_groups", type=int, default=5)
 
 # plot
 parser.add_argument(
     "--loguru_level",
     type=str,
     default="INFO",
-    help="TRACE > DEBUG > INFO > SUCCESS > WARNING > ERROR > CRITICAL",
+    help="TRACE < DEBUG < INFO < SUCCESS < WARNING < ERROR < CRITICAL",
 )
 parser.add_argument(
     "--plot_parameter_distribution",
@@ -39,6 +47,7 @@ parser.add_argument(
 # parser.add_argument( "--plot_hub_nodes", type=int, default=0, help="if this option is 1, the stats based on hub nodes are plotted",)
 # parser.add_argument( "--plot_graphs_community_detection", type=int, default=0, help="if this option is 1, the graphs based on community detection are drawed",)
 # parser.add_argument( "--plot_sparsity_mat_cd", type=int, default=0, help="if this option is 1, the sparsity of adj matrix based on community detection are drawed",)
+
 
 # augmentation
 parser.add_argument(

@@ -3,8 +3,20 @@ import torch
 import random
 import numpy as np
 import torch
+import subprocess
 from loguru import logger
 from datetime import datetime
+
+
+def get_gpu_memory_usage(device_id):
+    result = subprocess.run(
+        ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,nounits,noheader"],
+        capture_output=True,
+        text=True,
+    )
+    output = result.stdout.strip()
+    memory_usage = [int(x) for x in output.split("\n")]
+    return memory_usage[int(device_id)]
 
 
 def get_current_datetime():

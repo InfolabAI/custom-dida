@@ -16,8 +16,9 @@ logger.add(sink=sys.stdout, level=args.loguru_level)
 logger.info("Start")
 logger.debug("DUBUG Start")
 
+
 # prepare log path
-args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.propagate}_{args.alpha_std}_"
+args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.minnum_nodes_for_a_community}_{args.propagate}_{args.alpha_std}_"
 
 # load data
 args, data = load_data(args)

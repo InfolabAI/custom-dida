@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import math
+import dgl
 from loguru import logger
 from time import time
 from tqdm import tqdm
@@ -135,6 +136,7 @@ class OurModel(nn.Module):
         self.embeddings = None
         self.partition_dict = None
         self.total_step = 0  # for writer
+        self.comm_groups = None
 
     def _get_augmented_graph(self, list_of_dgl_graphs, t):
         """
@@ -162,13 +164,12 @@ class OurModel(nn.Module):
 
         return augmented_graph
 
-    def _get_graph_embeddings(self, list_of_dgl_graphs, epoch):
+    def _get_graph_embeddings(self, list_of_dgl_graphs, comm_group_id):
         """
         모든 t 의 original graph 에 대해 embedding 을 구하는 함수
         한번에 구하는 것이 필요한 이유는 t 에 대한 action 을 구하기 위해, t-1, t-2, ... 의 embedding 이 필요하기 때문
         """
         embeddings = []
-        partition_dict = {}
         with torch.no_grad():
             for t, dglG in tqdm(
                 enumerate(list_of_dgl_graphs),
@@ -178,8 +179,7 @@ class OurModel(nn.Module):
             ):
                 st = time()
                 # NOTE original graphs 에 대해 partition 을 한 번 저장하고 나면, 다음부터는 저장된 partition 을 사용
-                a_graph_at_t, partition = self._get_tr_input(dglG, t)
-                partition_dict[t] = partition
+                a_graph_at_t = self._get_tr_input(dglG, comm_group_id)
                 self.trainer.runnerProperty.writer.add_scalar(
                     "get_tr_input time", time() - st, self.total_step
                 )
@@ -189,44 +189,39 @@ class OurModel(nn.Module):
                     "main_model time", time() - st, self.total_step
                 )
 
-        self.partition_dict = partition_dict
         self.embeddings = embeddings
 
-    def _get_tr_input(self, dglG, t):
+    def _get_tr_input(self, dglG, comm_group_id):
+        """
+        - dglG 를 TrInputDict 로 변환하는 함수
+
+        Parameters
+        ----------
+        dglG: dgl graph
+        comm_group_id: int: 사전에 생성된 comm_groups 에서 몇 번째 comm_group 을 subgraph sampling 에 사용할 것인지에 대한 index
+        """
         dglG = dglG.to(self.args.device)
-        if self.args.use_subgraph:
-            graph_dict, partition = self._get_subgraphs_dict_and_partition(dglG, t)
+        if self.args.dont_use_subgraph:
+            graph_dict = self._get_graph_dict(dglG)
         else:
-            graph_dict, partition = self._get_graph_dict(dglG)
-        return graph_dict, partition
+            graph_dict = self._get_subgraphs_dict_and_comm_groups(dglG, comm_group_id)
+        return graph_dict
 
     def _get_graph_dict(self, dglG):
         a_graph_at_t = self.cgt.dglG_to_TrInputDict_NoSubgraphs(dglG)
-        return a_graph_at_t, None
+        return a_graph_at_t
 
-    def _get_subgraphs_dict_and_partition(self, dglG, t):
-        if self.partition_dict is not None:
-            partition = self.partition_dict[t]
-        else:
-            partition = None
+    def _get_subgraphs_dict_and_comm_groups(self, dglG, comm_group_id):
+        assert self.comm_groups is not None, "_generate_community_groups() 를 먼저 실행해야 함"
 
         st = time()
-        cd = CommunityDetection(self.args, dglG, partition)
-        self.trainer.runnerProperty.writer.add_scalar(
-            ">communityDetection time", time() - st, self.total_step
+        a_graph_at_t = self.cgt.dglG_to_TrInputDict(
+            dglG, self.comm_groups[comm_group_id]
         )
-        self.trainer.runnerProperty.writer.add_scalar(
-            "with partition", 1 if partition is not None else 0, self.total_step
-        )
-        # logger.info(
-        #    f"comunity detection time: {time() - st} with partition {partition is not None}"
-        # )
-        st = time()
-        a_graph_at_t = self.cgt.dglG_to_TrInputDict(dglG, cd.partition)
         self.trainer.runnerProperty.writer.add_scalar(
             "dgltotrinput time", time() - st, self.total_step
         )
-        return a_graph_at_t, cd.partition
+        return a_graph_at_t
 
     def _get_actions(self, list_of_dgl_graphs):
         """(DEPRECATED)
@@ -310,18 +305,37 @@ class OurModel(nn.Module):
 
         return augmented_graphs
 
+    def _generate_community_groups(self, list_of_dgl_graphs, num_comm_groups):
+        """
+        모든 dglG 의 edge 가 병합된 dglG 에 대해 num_comm_groups 만큼 community group 을 생성하는 함수
+        """
+        union_graph = dgl.merge(list_of_dgl_graphs)
+        logger.info(f"union_graph edges: {union_graph.edges()[0].shape[0]}")
+        union_graph = union_graph.remove_self_loop()
+        # removing parallel edges like [i,j] and [j,i]
+        # union_graph = dgl.to_simple(union_graph)
+        cd = CommunityDetection(self.args, union_graph)
+        comm_groups = cd.get_merged_communities(num_comm_groups=num_comm_groups)
+        self.comm_groups = comm_groups
+
     def forward(self, list_of_dgl_graphs, t, epoch, is_train):
         self.total_step += 1
+        comm_group_id = epoch % self.args.num_comm_groups
+        if epoch == 1 and t == 0 and is_train:
+            self._generate_community_groups(
+                list_of_dgl_graphs, self.args.num_comm_groups
+            )
+
         if epoch == 1 or self.args.propagate != "dyaug":
-            graph, partition = self._get_tr_input(list_of_dgl_graphs[t], t)
-            st = time()
-            embedding = self.main_model(graph)
-            logger.debug(f"main_model time: {time() - st}")
-            return embedding
+            dglG = list_of_dgl_graphs[t]
         else:
             if t == 0 and is_train:
-                self._get_graph_embeddings(list_of_dgl_graphs, epoch)
-            augG = self._get_augmented_graph(list_of_dgl_graphs, t)
-            graph, partition = self._get_tr_input(augG, t)
-            embedding = self.main_model(graph)
-            return embedding
+                self._get_graph_embeddings(list_of_dgl_graphs, comm_group_id)
+            dglG = self._get_augmented_graph(list_of_dgl_graphs, t)
+
+        graph = self._get_tr_input(dglG, comm_group_id)
+
+        st = time()
+        embedding = self.main_model(graph)
+        logger.debug(f"main_model time: {time() - st}")
+        return embedding
