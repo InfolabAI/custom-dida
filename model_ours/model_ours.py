@@ -178,7 +178,6 @@ class OurModel(nn.Module):
                 leave=False,
             ):
                 st = time()
-                # NOTE original graphs 에 대해 partition 을 한 번 저장하고 나면, 다음부터는 저장된 partition 을 사용
                 a_graph_at_t = self._get_tr_input(dglG, comm_group_id)
                 self.trainer.runnerProperty.writer.add_scalar(
                     "get_tr_input time", time() - st, self.total_step
@@ -212,7 +211,7 @@ class OurModel(nn.Module):
         return a_graph_at_t
 
     def _get_subgraphs_dict_and_comm_groups(self, dglG, comm_group_id):
-        assert self.comm_groups is not None, "_generate_community_groups() 를 먼저 실행해야 함"
+        assert self.comm_groups is not None, "generate_community_groups() 를 먼저 실행해야 함"
 
         st = time()
         a_graph_at_t = self.cgt.dglG_to_TrInputDict(
@@ -305,7 +304,7 @@ class OurModel(nn.Module):
 
         return augmented_graphs
 
-    def _generate_community_groups(self, list_of_dgl_graphs, num_comm_groups):
+    def generate_community_groups(self, list_of_dgl_graphs, num_comm_groups):
         """
         모든 dglG 의 edge 가 병합된 dglG 에 대해 num_comm_groups 만큼 community group 을 생성하는 함수
         """
@@ -321,10 +320,6 @@ class OurModel(nn.Module):
     def forward(self, list_of_dgl_graphs, t, epoch, is_train):
         self.total_step += 1
         comm_group_id = epoch % self.args.num_comm_groups
-        if epoch == 1 and t == 0 and is_train:
-            self._generate_community_groups(
-                list_of_dgl_graphs, self.args.num_comm_groups
-            )
 
         if epoch == 1 or self.args.propagate != "dyaug":
             dglG = list_of_dgl_graphs[t]

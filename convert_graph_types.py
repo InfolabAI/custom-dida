@@ -177,8 +177,7 @@ class ConvertGraphTypes:
             edge_tensor = torch.concat(
                 [subgraph.edges()[0].unsqueeze(0), subgraph.edges()[1].unsqueeze(0)]
             )
-            if edge_tensor.shape[1] != 0:
-                a_graph_at_t["edge_index"].append(edge_tensor)
+            a_graph_at_t["edge_index"].append(edge_tensor)
             a_graph_at_t["node_num"].append(subgraph.num_nodes())
             a_graph_at_t["edge_num"].append(subgraph.num_edges())
         # logger.info(">" * 10, "time for making a_graph_at_t:", time() - st)
@@ -186,6 +185,7 @@ class ConvertGraphTypes:
         st = time()
         a_graph_at_t["node_data"] = torch.concat(a_graph_at_t["node_data"])
         a_graph_at_t["edge_data"] = torch.concat(a_graph_at_t["edge_data"])
+        # BitCoinAlpha 는 하나의 t 에 edge 가 8개 밖에 없는 경우도 있어서, 사전에 정한 comm_group 중 일부는 edge 가 1개도 없는 subgraph 를 생성할수도 있음(즉, 모든 edge 가 neglect 됨)
         a_graph_at_t["edge_index"] = torch.concat(a_graph_at_t["edge_index"], dim=1)
         # logger.info(">" * 10, "concat time:", time() - st)
         a_graph_at_t["mapping_from_orig_to_subgraphs"] = mapping_from_orig_to_subgraphs

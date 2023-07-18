@@ -27,7 +27,12 @@ parser.add_argument(
     default="louvain",
     help="louvain | random",
 )
-parser.add_argument("--minnum_nodes_for_a_community", type=int, default=100)
+parser.add_argument(
+    "--minnum_nodes_for_a_community",
+    type=int,
+    default=0,
+    help="This value is pre-fixed according to the dataset",
+)
 parser.add_argument("--num_comm_groups", type=int, default=5)
 
 # plot
@@ -68,7 +73,7 @@ parser.add_argument(
     "--model", type=str, help="tokengt_nocd | tokengt_cd | tokengt_cdrandom | dida"
 )
 parser.add_argument(
-    "--max_epoch", type=int, default=100, help="number of epochs to train."
+    "--max_epoch", type=int, default=500, help="number of epochs to train."
 )
 parser.add_argument("--testlength", type=int, default=3, help="length for test")
 parser.add_argument("--device", type=str, default="cpu", help="training device")
@@ -124,7 +129,23 @@ else:
     args.device = torch.device("cpu")
     logger.info("using cpu to train the model")
 
+# For ours
+if args.dataset == "collab":
+    args.minnum_nodes_for_a_community = 1000
+elif args.dataset == "yelp":
+    args.minnum_nodes_for_a_community = 2000
+elif args.dataset == "redditbody":
+    args.minnum_nodes_for_a_community = 5000
+elif args.dataset == "wikielec":
+    args.minnum_nodes_for_a_community = 2000
+elif args.dataset == "bitcoin":
+    args.minnum_nodes_for_a_community = 1000
+else:
+    raise NotImplementedError
 
+logger.info("minnum_nodes_for_a_community:{}".format(args.minnum_nodes_for_a_community))
+
+# For DIDA
 if args.use_cfg:
     if args.dataset == "collab":
         hp = {
