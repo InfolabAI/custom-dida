@@ -7,6 +7,7 @@ from model_ours.model_ours import OurModel
 from loguru import logger
 from config import args
 from utils_main import *
+from debug_logger import DebugLogger
 from torch.utils.tensorboard import SummaryWriter
 from utils_main import get_current_datetime
 from dataset_loader.utils_data import load_data, prepare_dir
@@ -36,14 +37,17 @@ else:
 
 prepare_dir(args.log_dir)
 
+seed_dir = os.path.join(args.log_dir, f"seed{args.seed}")
 # save args and a log file
 info_dict = get_arg_dict(args)
 json.dump(info_dict, open(os.path.join(args.log_dir, "tokengt_info.json"), "w"))
 logger.add(
-    os.path.join(args.log_dir, "log.log"),
+    os.path.join(seed_dir, "log.log"),
     format="{time}:{file}:{function}:{level}:{message}",
     level="DEBUG",
 )
+writer = SummaryWriter(seed_dir)
+setattr(args, "debug_logger", DebugLogger(args, writer))
 
 # get the number of model's parameters
 num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -54,6 +58,6 @@ runner = Runner(
     args,
     model,
     data,
-    writer=SummaryWriter(os.path.join(args.log_dir, f"seed{args.seed}")),
+    writer=writer,
 )
 runner.run()

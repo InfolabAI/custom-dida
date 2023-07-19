@@ -42,12 +42,6 @@ parser.add_argument(
     default="INFO",
     help="TRACE < DEBUG < INFO < SUCCESS < WARNING < ERROR < CRITICAL",
 )
-parser.add_argument(
-    "--plot_parameter_distribution",
-    type=int,
-    default=0,
-    help="if this option is 1, the distribution of parameters are plotted in Tensorboard",
-)
 # parser.add_argument( "--plot", type=int, default=0, help="if this option is 1, the stats of datasets are plotted",)
 # parser.add_argument( "--plot_hub_nodes", type=int, default=0, help="if this option is 1, the stats based on hub nodes are plotted",)
 # parser.add_argument( "--plot_graphs_community_detection", type=int, default=0, help="if this option is 1, the graphs based on community detection are drawed",)
@@ -74,6 +68,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--max_epoch", type=int, default=500, help="number of epochs to train."
+)
+parser.add_argument(
+    "--total_step", type=int, default=0, help=""
 )
 parser.add_argument("--testlength", type=int, default=3, help="length for test")
 parser.add_argument("--device", type=str, default="cpu", help="training device")

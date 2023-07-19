@@ -8,7 +8,6 @@ from tqdm import tqdm
 class TrainerOurs(TrainerAndTester):
     def __init__(self, args, model, data_to_prepare):
         super().__init__(args, model, data_to_prepare)
-        self.total_step = 0  # For writer
         pass
 
     def train(self, epoch, data):
@@ -68,13 +67,15 @@ class TrainerOurs(TrainerAndTester):
             # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
             optimizer.step()
             epoch_losses.append(loss.detach().item())
-            if self.args.plot_parameter_distribution == 1:
+            if self.args.loguru_level == "DEBUG":
                 for name, param in self.model.named_parameters():
                     self.runnerProperty.writer.add_histogram(
-                        name, param, self.total_step
+                        name, param, self.args.total_step
                     )
-            logger.debug(f"GPU usage: {get_gpu_memory_usage(self.args.device_id)} MiB")
-            self.total_step += 1
+            self.args.debug_logger.loguru(
+                f"GPU usage", f"{get_gpu_memory_usage(self.args.device_id)} MiB", 1000
+            )
+            self.args.total_step += 1
 
         average_epoch_loss = np.array(epoch_losses).mean()
         self.runnerProperty.writer.add_scalar("epoch_loss", loss.detach().cpu(), epoch)

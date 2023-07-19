@@ -88,6 +88,7 @@ class Attention(nn.Module):
         attn = attn.squeeze(0)
         # [t, embed_dim] -> [t, 1] -> [1, t]
         attn = self.linear(attn).transpose(0, 1)
+        self.args.debug_logger.histogram("attn", attn.flatten(), 100, attn.shape[1] > 5)
         if attn.shape[1] > 1 and self.args.alpha_std == 1:
             attn = attn / (attn.std() + 1e-8)
         # [1, t] -> [t]
@@ -129,13 +130,11 @@ class OurModel(nn.Module):
         self.attention = Attention(args, num_nodes)
         self.cs_decoder = MultiplyPredictor()
 
-        self.args = args
         self.trainer = TrainerOurs(args, self, data_to_prepare)
         self.tester = TesterOurs(args, self, data_to_prepare)
         self.cgt = ConvertGraphTypes()
         self.embeddings = None
         self.partition_dict = None
-        self.total_step = 0  # for writer
         self.comm_groups = None
 
     def _get_augmented_graph(self, list_of_dgl_graphs, t):
@@ -148,13 +147,8 @@ class OurModel(nn.Module):
 
         # actions for t=1 (action for t=0), t=2 (actions for t=1, 0), t=3 (actions for t=2, 1, 0), ...
         action = self._get_action(self.embeddings, t)
-        self.trainer.runnerProperty.writer.add_histogram(
-            "action", action, self.total_step
-        )
-        if self.total_step == 0 or self.total_step % 100 == 0:
-            self.trainer.runnerProperty.writer.add_text(
-                "action", str(action), self.total_step
-            )
+        self.args.debug_logger.histogram("action", action, 100, len(action) > 5)
+        self.args.debug_logger.loguru(f"action", action, 100, len(action) > 5)
         # NOTE [::-1] reversed indices to sync this to action
         sublist_of_dgl_graphs = list_of_dgl_graphs[:t][::-1]
         cur_graph = list_of_dgl_graphs[t]
@@ -179,14 +173,10 @@ class OurModel(nn.Module):
             ):
                 st = time()
                 a_graph_at_t = self._get_tr_input(dglG, comm_group_id)
-                self.trainer.runnerProperty.writer.add_scalar(
-                    "get_tr_input time", time() - st, self.total_step
-                )
+                self.args.debug_logger.loguru(f"get_tr_input", time() - st, 1000)
                 st = time()
                 embeddings.append(self.main_model(a_graph_at_t, get_embedding=True))
-                self.trainer.runnerProperty.writer.add_scalar(
-                    "main_model time", time() - st, self.total_step
-                )
+                self.args.debug_logger.loguru(f"main_model_time", time() - st, 1000)
 
         self.embeddings = embeddings
 
@@ -217,9 +207,7 @@ class OurModel(nn.Module):
         a_graph_at_t = self.cgt.dglG_to_TrInputDict(
             dglG, self.comm_groups[comm_group_id]
         )
-        self.trainer.runnerProperty.writer.add_scalar(
-            "dgltotrinput time", time() - st, self.total_step
-        )
+        self.args.debug_logger.loguru(f"dgltotrinput", time() - st, 1000)
         return a_graph_at_t
 
     def _get_actions(self, list_of_dgl_graphs):
@@ -274,11 +262,8 @@ class OurModel(nn.Module):
             cur_graph.ndata["w"],
             cur_adj.nnz * edge_number_limit_ratio,
         )
-
-        self.trainer.runnerProperty.writer.add_scalar(
-            "Ratio of #orig_edges to $aug_edges",
-            new_graph.adj().nnz / cur_adj.nnz,
-            self.total_step,
+        self.args.debug_logger.scalar(
+            f"Ratio of #orig_edges to $aug_edges", new_graph.adj().nnz / cur_adj.nnz, 1
         )
         return new_graph
 
@@ -318,10 +303,9 @@ class OurModel(nn.Module):
         self.comm_groups = comm_groups
 
     def forward(self, list_of_dgl_graphs, t, epoch, is_train):
-        self.total_step += 1
         comm_group_id = epoch % self.args.num_comm_groups
 
-        if epoch == 1 or self.args.propagate != "dyaug":
+        if epoch == 11 or self.args.propagate != "dyaug":
             dglG = list_of_dgl_graphs[t]
         else:
             if t == 0 and is_train:
@@ -332,5 +316,5 @@ class OurModel(nn.Module):
 
         st = time()
         embedding = self.main_model(graph)
-        logger.debug(f"main_model time: {time() - st}")
+        self.args.debug_logger.loguru(f"main_model", time() - st, 1000)
         return embedding
