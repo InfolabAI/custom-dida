@@ -145,19 +145,22 @@ class ConvertGraphTypes:
         }
         return a_graph_at_t
 
-    def dglG_to_TrInputDict(self, dglG, comm_group):
+    def dglG_to_TrInputDict(self, dglG, minnum_nodes):
         """
         Parameters
         --------
         dglG: dgl.graph
-        comm_group: dict: {partition_id: [node_index, ...]}
+        minnum_nodes: int: deactivated nodes 로 community 를 만들 때 최소한의 node 수
         """
         st = time()
 
         subgraph_list = []
         node_data_index = 0
         mapping_from_orig_to_subgraphs = {}
-        # logger.info(">" * 10, "time for converting partition:", time() - st)
+        # 모든 activated nodes 를 하나의 community 로 간주하고, 나머지는 적절한 크기의 community 로 배분
+        comm_group = self._get_simple_communities(
+            torch.concat(dglG.edges()).unique().tolist(), dglG.num_nodes(), minnum_nodes
+        )
 
         st = time()
         # extract subgraphs with edge
@@ -190,6 +193,10 @@ class ConvertGraphTypes:
         # logger.info(">" * 10, "concat time:", time() - st)
         a_graph_at_t["mapping_from_orig_to_subgraphs"] = mapping_from_orig_to_subgraphs
 
+        logger.debug(
+            f"original #edges: {dglG.num_edges()} -> #edges: {a_graph_at_t['edge_index'].shape[1]}"
+        )
+
         return a_graph_at_t
 
     def weighted_adjacency_to_graph(self, adj, node_features, edge_number_limitation):
@@ -218,3 +225,24 @@ class ConvertGraphTypes:
         # graph = dgl.to_simple(graph)
 
         return graph
+
+    def _get_simple_communities(
+        self, activated_node_indices: list, num_entire_nodes: int, minnum_nodes: int
+    ):
+        """
+        activated_nodes 전체를 하나의 community 로 만들고, 나머지도 이전 community size 에 맞는 community 로 만듬
+
+        Parameters
+        --------
+        minnum_nodes: int: deactivated nodes 로 community 를 만들 때 최소한의 node 수
+        """
+        entire_nodes = np.arange(num_entire_nodes)
+        deactivated_nodes = np.setdiff1d(entire_nodes, activated_node_indices)
+        comm = {}
+        comm[0] = activated_node_indices
+        comm_id = 1
+        size = max(minnum_nodes * 2, len(activated_node_indices))
+        for i in range(0, len(deactivated_nodes), size):
+            comm[comm_id] = deactivated_nodes[i : i + size]
+            comm_id += 1
+        return comm

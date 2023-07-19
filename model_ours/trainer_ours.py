@@ -26,11 +26,6 @@ class TrainerOurs(TrainerAndTester):
         edge_index = []
         edge_label = []
         epoch_losses = []
-        if epoch == 1:
-            # train data 에 대한 union graph 로 community group 을 만듬
-            self.model.generate_community_groups(
-                data[: self.runnerProperty.len_train], self.args.num_comm_groups
-            )
 
         for t in tqdm(
             range(self.runnerProperty.len_train - 1), desc="Training", leave=False

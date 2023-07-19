@@ -37,7 +37,7 @@ def remove_duplicated_edges(edges):
     remove_dup_edge_num = edges.shape[1]
     edges = edges[:, edges[0] != edges[1]]
     remove_self_loop = edges.shape[1]
-    logger.info(
+    logger.debug(
         f"Remove duplicated edges: {original_edge_num - remove_dup_edge_num} and self-loop edges: {remove_dup_edge_num - remove_self_loop}"
     )
     return edges

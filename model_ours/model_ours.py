@@ -6,7 +6,6 @@ from loguru import logger
 from time import time
 from tqdm import tqdm
 from convert_graph_types import ConvertGraphTypes
-from community_dectection import CommunityDetection
 from model_ours.modules.model_tokengt import TokenGTModel
 from model_ours.modules.multihead_attention import MultiheadAttention
 from model_ours.trainer_ours import TrainerOurs
@@ -134,8 +133,6 @@ class OurModel(nn.Module):
         self.tester = TesterOurs(args, self, data_to_prepare)
         self.cgt = ConvertGraphTypes()
         self.embeddings = None
-        self.partition_dict = None
-        self.comm_groups = None
 
     def _get_augmented_graph(self, list_of_dgl_graphs, t):
         """
@@ -158,7 +155,7 @@ class OurModel(nn.Module):
 
         return augmented_graph
 
-    def _get_graph_embeddings(self, list_of_dgl_graphs, comm_group_id):
+    def _get_graph_embeddings(self, list_of_dgl_graphs):
         """
         모든 t 의 original graph 에 대해 embedding 을 구하는 함수
         한번에 구하는 것이 필요한 이유는 t 에 대한 action 을 구하기 위해, t-1, t-2, ... 의 embedding 이 필요하기 때문
@@ -172,7 +169,7 @@ class OurModel(nn.Module):
                 leave=False,
             ):
                 st = time()
-                a_graph_at_t = self._get_tr_input(dglG, comm_group_id)
+                a_graph_at_t = self._get_tr_input(dglG)
                 self.args.debug_logger.loguru(f"get_tr_input", time() - st, 1000)
                 st = time()
                 embeddings.append(self.main_model(a_graph_at_t, get_embedding=True))
@@ -180,34 +177,21 @@ class OurModel(nn.Module):
 
         self.embeddings = embeddings
 
-    def _get_tr_input(self, dglG, comm_group_id):
+    def _get_tr_input(self, dglG):
         """
         - dglG 를 TrInputDict 로 변환하는 함수
 
         Parameters
         ----------
         dglG: dgl graph
-        comm_group_id: int: 사전에 생성된 comm_groups 에서 몇 번째 comm_group 을 subgraph sampling 에 사용할 것인지에 대한 index
         """
         dglG = dglG.to(self.args.device)
         if self.args.dont_use_subgraph:
-            graph_dict = self._get_graph_dict(dglG)
+            a_graph_at_t = self.cgt.dglG_to_TrInputDict_NoSubgraphs(dglG)
         else:
-            graph_dict = self._get_subgraphs_dict_and_comm_groups(dglG, comm_group_id)
-        return graph_dict
-
-    def _get_graph_dict(self, dglG):
-        a_graph_at_t = self.cgt.dglG_to_TrInputDict_NoSubgraphs(dglG)
-        return a_graph_at_t
-
-    def _get_subgraphs_dict_and_comm_groups(self, dglG, comm_group_id):
-        assert self.comm_groups is not None, "generate_community_groups() 를 먼저 실행해야 함"
-
-        st = time()
-        a_graph_at_t = self.cgt.dglG_to_TrInputDict(
-            dglG, self.comm_groups[comm_group_id]
-        )
-        self.args.debug_logger.loguru(f"dgltotrinput", time() - st, 1000)
+            a_graph_at_t = self.cgt.dglG_to_TrInputDict(
+                dglG, self.args.minnum_nodes_for_a_community
+            )
         return a_graph_at_t
 
     def _get_actions(self, list_of_dgl_graphs):
@@ -289,30 +273,15 @@ class OurModel(nn.Module):
 
         return augmented_graphs
 
-    def generate_community_groups(self, list_of_dgl_graphs, num_comm_groups):
-        """
-        모든 dglG 의 edge 가 병합된 dglG 에 대해 num_comm_groups 만큼 community group 을 생성하는 함수
-        """
-        union_graph = dgl.merge(list_of_dgl_graphs)
-        logger.info(f"union_graph edges: {union_graph.edges()[0].shape[0]}")
-        union_graph = union_graph.remove_self_loop()
-        # removing parallel edges like [i,j] and [j,i]
-        # union_graph = dgl.to_simple(union_graph)
-        cd = CommunityDetection(self.args, union_graph)
-        comm_groups = cd.get_merged_communities(num_comm_groups=num_comm_groups)
-        self.comm_groups = comm_groups
-
     def forward(self, list_of_dgl_graphs, t, epoch, is_train):
-        comm_group_id = epoch % self.args.num_comm_groups
-
-        if epoch == 11 or self.args.propagate != "dyaug":
+        if epoch == 1 or self.args.propagate != "dyaug":
             dglG = list_of_dgl_graphs[t]
         else:
             if t == 0 and is_train:
-                self._get_graph_embeddings(list_of_dgl_graphs, comm_group_id)
+                self._get_graph_embeddings(list_of_dgl_graphs)
             dglG = self._get_augmented_graph(list_of_dgl_graphs, t)
 
-        graph = self._get_tr_input(dglG, comm_group_id)
+        graph = self._get_tr_input(dglG)
 
         st = time()
         embedding = self.main_model(graph)

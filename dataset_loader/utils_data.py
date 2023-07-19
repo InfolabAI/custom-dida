@@ -126,8 +126,8 @@ def load_data(args, dataset=None):
         args.num_nodes = len(data["x"])
     else:
         raise NotImplementedError(f"Unknown dataset {dataset}")
-    logger.info(f"Loading dataset {dataset}")
-    logger.info(
+    logger.debug(f"Loading dataset {dataset}")
+    logger.debug(
         f"Adding uniform edges features having the same shape of x in data to dataset {dataset}"
     )
 

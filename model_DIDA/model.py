@@ -153,6 +153,7 @@ class DGNNLayer(nn.Module):
         spu = res_msg * spu_att.view(-1, self.n_heads, 1)  # [E,h,F/h]
         spu = spu.view(-1, self.hid_dim)  # [E,F]
 
+        breakpoint()
         # disentangle
         causal_hat = scatter(
             res, ei_tar, dim=self.node_dim, dim_size=x_tar.shape[0], reduce=self.aggr

@@ -22,18 +22,11 @@ parser.add_argument("--dataset", type=str, default="collab", help="datasets")
 parser.add_argument("--num_nodes", type=int, default=-1, help="num of nodes")
 parser.add_argument("--nfeat", type=int, default=128, help="dim of input feature")
 parser.add_argument(
-    "--comm_alg",
-    type=str,
-    default="louvain",
-    help="louvain | random",
-)
-parser.add_argument(
     "--minnum_nodes_for_a_community",
     type=int,
     default=0,
     help="This value is pre-fixed according to the dataset",
 )
-parser.add_argument("--num_comm_groups", type=int, default=5)
 
 # plot
 parser.add_argument(
@@ -69,9 +62,7 @@ parser.add_argument(
 parser.add_argument(
     "--max_epoch", type=int, default=500, help="number of epochs to train."
 )
-parser.add_argument(
-    "--total_step", type=int, default=0, help=""
-)
+parser.add_argument("--total_step", type=int, default=0, help="")
 parser.add_argument("--testlength", type=int, default=3, help="length for test")
 parser.add_argument("--device", type=str, default="cpu", help="training device")
 parser.add_argument("--device_id", type=str, default="0", help="device id for gpu")
