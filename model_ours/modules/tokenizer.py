@@ -23,55 +23,25 @@ class GraphFeatureTokenizer(nn.Module):
 
     def __init__(
         self,
-        num_atoms,
-        num_edges,
-        rand_node_id,
-        rand_node_id_dim,
-        orf_node_id,
-        orf_node_id_dim,
-        lap_node_id,
-        lap_node_id_k,
-        lap_node_id_sign_flip,
-        lap_node_id_eig_dropout,
-        type_id,
+        args,
         hidden_dim,
         n_layers,
     ):
         super(GraphFeatureTokenizer, self).__init__()
 
-        self.encoder_embed_dim = hidden_dim
-
-        self.graph_token = nn.Embedding(1, hidden_dim)
-        self.null_token = nn.Embedding(1, hidden_dim)  # this is optional
-
-        self.rand_node_id = rand_node_id
-        self.rand_node_id_dim = rand_node_id_dim
-        self.orf_node_id = orf_node_id
-        self.orf_node_id_dim = orf_node_id_dim
-        self.lap_node_id = lap_node_id
-        self.lap_node_id_k = lap_node_id_k
-        self.lap_node_id_sign_flip = lap_node_id_sign_flip
-
-        self.type_id = type_id
-
-        if self.rand_node_id:
-            self.rand_encoder = nn.Linear(2 * rand_node_id_dim, hidden_dim, bias=False)
-
-        if self.lap_node_id:
-            self.lap_encoder = nn.Linear(2 * lap_node_id_k, hidden_dim, bias=False)
-            self.lap_eig_dropout = (
-                nn.Dropout2d(p=lap_node_id_eig_dropout)
-                if lap_node_id_eig_dropout > 0
-                else None
-            )
-
-        if self.orf_node_id:
-            self.orf_encoder = nn.Linear(2 * orf_node_id_dim, hidden_dim, bias=False)
-
-        if self.type_id:
-            self.order_encoder = nn.Embedding(2, hidden_dim)
+        self.type_id = True
+        self.order_encoder = nn.Embedding(2, hidden_dim)
 
         self.apply(lambda module: init_params(module, n_layers=n_layers))
+
+        self.orf_encoder = nn.Linear(2 * hidden_dim, hidden_dim, bias=False)
+        # from orf.py
+        q, r = torch.linalg.qr(
+            torch.randn((1, args.num_nodes, hidden_dim), device=args.device),
+            mode="reduced",
+        )
+        # [1, num_entire_nodes, hidden_dim] -> [num_entire_nodes, hidden_dim]
+        self.orf = torch.nn.functional.normalize(q, p=2, dim=2).squeeze(0)
 
     @staticmethod
     def get_batch(
@@ -229,34 +199,6 @@ class GraphFeatureTokenizer(nn.Module):
         order_embed = self.order_encoder(order)
         return order_embed
 
-    def add_special_tokens(self, padded_feature, padding_mask):
-        """
-        :param padded_feature: Tensor([B, T, D])
-        :param padding_mask: BoolTensor([B, T])
-        :return: padded_feature: Tensor([B, 2/3 + T, D]), padding_mask: BoolTensor([B, 2/3 + T])
-        """
-        b, _, d = padded_feature.size()
-
-        num_special_tokens = 2
-        graph_token_feature = self.graph_token.weight.expand(b, 1, d)  # [1, D]
-        null_token_feature = self.null_token.weight.expand(
-            b, 1, d
-        )  # [1, D], this is optional
-        special_token_feature = torch.cat(
-            (graph_token_feature, null_token_feature), dim=1
-        )  # [B, 2, D]
-        special_token_mask = torch.zeros(
-            b, num_special_tokens, dtype=torch.bool, device=padded_feature.device
-        )
-
-        padded_feature = torch.cat(
-            (special_token_feature, padded_feature), dim=1
-        )  # [B, 2 + T, D]
-        padding_mask = torch.cat(
-            (special_token_mask, padding_mask), dim=1
-        )  # [B, 2 + T]
-        return padded_feature, padding_mask
-
     def forward(self, batched_data, perturb=None):
         (
             node_data,
@@ -264,12 +206,14 @@ class GraphFeatureTokenizer(nn.Module):
             edge_index,
             edge_data,
             edge_num,
+            indices_subnodes,
         ) = (
             batched_data["node_data"],
             batched_data["node_num"],
             batched_data["edge_index"],
             batched_data["edge_data"],
             batched_data["edge_num"],
+            batched_data["indices_subnodes"],
         )
 
         node_feature = node_data
@@ -290,42 +234,20 @@ class GraphFeatureTokenizer(nn.Module):
             node_num, node_feature.device
         )  # [B, max(n_node)]
 
-        if self.rand_node_id:
-            rand_node_id = torch.rand(
-                sum(node_num), self.rand_node_id_dim, device=device, dtype=dtype
-            )  # [sum(n_node), D]
-            rand_node_id = F.normalize(rand_node_id, p=2, dim=1)
-            rand_index_embed = self.get_index_embed(
-                rand_node_id, node_mask, padded_index
-            )  # [B, T, 2D]
-            padded_feature = padded_feature + self.rand_encoder(rand_index_embed)
+        # apply orf id
+        orf_id_list = []
+        for id_tensor in indices_subnodes:
+            orf_id_list.append(self.orf[id_tensor])
 
-        if self.orf_node_id:
-            b, max_n = len(node_num), max(node_num)
-            orf = gaussian_orthogonal_random_matrix_batched(
-                b, max_n, max_n, device=device, dtype=dtype
-            )  # [b, max(n_node), max(n_node)]
-            orf_node_id = orf[node_mask]  # [sum(n_node), max(n_node)]
-            if self.orf_node_id_dim > max_n:
-                orf_node_id = F.pad(
-                    orf_node_id, (0, self.orf_node_id_dim - max_n), value=float("0")
-                )  # [sum(n_node), Do]
-            else:
-                orf_node_id = orf_node_id[
-                    ..., : self.orf_node_id_dim
-                ]  # [sum(n_node), Do]
-            orf_node_id = F.normalize(orf_node_id, p=2, dim=1)
-            orf_index_embed = self.get_index_embed(
-                orf_node_id, node_mask, padded_index
-            )  # [B, T, 2Do]
-            padded_feature = padded_feature + self.orf_encoder(orf_index_embed)
+        # [sum(#nodes), embed_dim]
+        orf_node_id = torch.concat(orf_id_list, dim=0)
+        # [sum(#nodes), embed_dim] -> [#subgraphs, max(#nodes), 2*embed_dim]
+        orf_embed = self.get_index_embed(orf_node_id, node_mask, padded_index)
+        # [#subgraphs, max(#nodes), 2*embed_dim] -> [#subgraphs, max(#nodes), embed_dim]
+        padded_feature = padded_feature + self.orf_encoder(orf_embed)
 
-        if self.type_id:
-            padded_feature = padded_feature + self.get_type_embed(padded_index)
-
-        # padded_feature, padding_mask = self.add_special_tokens(
-        #    padded_feature, padding_mask
-        # )  # [B, 2+T, D], [B, 2+T]
+        # apply type id
+        padded_feature = padded_feature + self.get_type_embed(padded_index)
 
         padded_feature = padded_feature.masked_fill(padding_mask[..., None], float("0"))
 

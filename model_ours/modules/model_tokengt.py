@@ -42,6 +42,8 @@ class TokenGTModel(FairseqEncoderModel):
         if args.performer_finetune:
             self.encoder.performer_finetune_setup()
 
+        self.stem = nn.Linear(32, args.encoder_embed_dim, bias=bool(args.lin_bias))
+
     @staticmethod
     def add_args(parser):
         """Add model-specific arguments to the parser."""
@@ -226,7 +228,8 @@ class TokenGTModel(FairseqEncoderModel):
         return cls(merged_args, encoder)
 
     def forward(self, batched_data, **kwargs):
-        # stem - nn.Linear(32, 16).to(batched_data['node_data'].device)(batched_data['node_data']).shape
+        # batched_data["node_data"] = self.stem(batched_data["node_data"])
+        # batched_data["edge_data"] = nn.functional.adaptive_avg_pool1d( batched_data["edge_data"], batched_data["node_data"].shape[1])
         node_data = self.encoder(batched_data, **kwargs)
         st = time.time()
         if "get_embedding" in kwargs:
@@ -257,28 +260,7 @@ class TokenGTEncoder(FairseqEncoder):
             raise NotImplementedError
 
         self.graph_encoder = TokenGTGraphEncoder(
-            # <
-            num_atoms=args.num_atoms,
-            num_in_degree=args.num_in_degree,
-            num_out_degree=args.num_out_degree,
-            num_edges=args.num_edges,
-            num_spatial=args.num_spatial,
-            num_edge_dis=args.num_edge_dis,
-            edge_type=args.edge_type,
-            multi_hop_max_dist=args.multi_hop_max_dist,
-            # >
-            # < for tokenization
-            rand_node_id=args.rand_node_id,
-            rand_node_id_dim=args.rand_node_id_dim,
-            orf_node_id=args.orf_node_id,
-            orf_node_id_dim=args.orf_node_id_dim,
-            lap_node_id=args.lap_node_id,
-            lap_node_id_k=args.lap_node_id_k,
-            lap_node_id_sign_flip=args.lap_node_id_sign_flip,
-            lap_node_id_eig_dropout=args.lap_node_id_eig_dropout,
-            type_id=args.type_id,
-            # >
-            # <
+            args=args,
             stochastic_depth=args.stochastic_depth,
             performer=args.performer,
             performer_finetune=args.performer_finetune,

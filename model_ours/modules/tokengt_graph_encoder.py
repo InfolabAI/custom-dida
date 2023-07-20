@@ -44,23 +44,7 @@ def init_graphormer_params(module):
 class TokenGTGraphEncoder(nn.Module):
     def __init__(
         self,
-        num_atoms: int,
-        num_in_degree: int,
-        num_out_degree: int,
-        num_edges: int,
-        num_spatial: int,
-        num_edge_dis: int,
-        edge_type: str,
-        multi_hop_max_dist: int,
-        rand_node_id: bool = False,
-        rand_node_id_dim: int = 64,
-        orf_node_id: bool = False,
-        orf_node_id_dim: int = 64,
-        lap_node_id: bool = False,
-        lap_node_id_k: int = 8,
-        lap_node_id_sign_flip: bool = False,
-        lap_node_id_eig_dropout: float = 0.0,
-        type_id: bool = False,
+        args,
         stochastic_depth: bool = False,
         performer: bool = False,
         performer_finetune: bool = False,
@@ -101,17 +85,7 @@ class TokenGTGraphEncoder(nn.Module):
         self.performer_finetune = performer_finetune
 
         self.graph_feature = GraphFeatureTokenizer(
-            num_atoms=num_atoms,
-            num_edges=num_edges,
-            rand_node_id=rand_node_id,
-            rand_node_id_dim=rand_node_id_dim,
-            orf_node_id=orf_node_id,
-            orf_node_id_dim=orf_node_id_dim,
-            lap_node_id=lap_node_id,
-            lap_node_id_k=lap_node_id_k,
-            lap_node_id_sign_flip=lap_node_id_sign_flip,
-            lap_node_id_eig_dropout=lap_node_id_eig_dropout,
-            type_id=type_id,
+            args=args,
             hidden_dim=embedding_dim,
             n_layers=num_encoder_layers,
         )
@@ -279,12 +253,12 @@ class TokenGTGraphEncoder(nn.Module):
         token_embeddings: Optional[torch.Tensor] = None,
         attn_mask: Optional[torch.Tensor] = None,
     ):
-        st = time.time()
         is_tpu = False
 
         if self.performer and self.performer_auto_check_redraw:
             self.performer_proj_updater.redraw_projections()
 
+        st = time.time()
         if token_embeddings is not None:
             raise NotImplementedError
         else:
@@ -295,6 +269,7 @@ class TokenGTGraphEncoder(nn.Module):
                 padded_node_mask,
                 padded_edge_mask,
             ) = self.graph_feature(batched_data, perturb)
+        logger.debug(f"ET [graph_feature]: {time.time() - st:.5f}")
 
         # x: B x T x C
 
@@ -321,6 +296,7 @@ class TokenGTGraphEncoder(nn.Module):
         if attn_mask is not None:
             raise NotImplementedError
 
+        st = time.time()
         attn_dict = {"maps": {}, "padded_index": padded_index}
         for i in range(len(self.layers)):
             layer = self.layers[i]
@@ -338,5 +314,5 @@ class TokenGTGraphEncoder(nn.Module):
         # restore node_features (i.e., batched_data['node_data'])
         # x: T x B x C -> B x T x C -> (node_num) x C
         node_data = x.transpose(0, 1)[padded_node_mask, :]
-        # logger.info(f"ET [pure forward]: {time.time() - st:.8f}")
+        logger.debug(f"ET [pure forward]: {time.time() - st:.5f}")
         return node_data

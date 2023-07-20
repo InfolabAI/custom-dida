@@ -9,7 +9,7 @@ import torch.nn.functional as F
 @torch.no_grad()
 def orthogonal_matrix_chunk(cols, device=None):
     unstructured_block = torch.randn((cols, cols), device=device)
-    q, r = torch.linalg.qr(unstructured_block, mode='reduced')
+    q, r = torch.linalg.qr(unstructured_block, mode="reduced")
     return q.t()  # [cols, cols]
 
 
@@ -41,12 +41,14 @@ def gaussian_orthogonal_random_matrix(nb_rows, nb_columns, device=None):
 @torch.no_grad()
 def orthogonal_matrix_chunk_batched(bsz, cols, device=None):
     unstructured_block = torch.randn((bsz, cols, cols), device=device)
-    q, r = torch.linalg.qr(unstructured_block, mode='reduced')
+    q, r = torch.linalg.qr(unstructured_block, mode="reduced")
     return q.transpose(2, 1)  # [bsz, cols, cols]
 
 
 @torch.no_grad()
-def gaussian_orthogonal_random_matrix_batched(nb_samples, nb_rows, nb_columns, device=None, dtype=torch.float32):
+def gaussian_orthogonal_random_matrix_batched(
+    nb_samples, nb_rows, nb_columns, device=None, dtype=torch.float32
+):
     """create 2D Gaussian orthogonal matrix"""
     nb_full_blocks = int(nb_rows / nb_columns)
 

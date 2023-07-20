@@ -2,6 +2,7 @@ import networkx as nx
 import dgl
 import numpy as np
 import torch
+import spicy
 from loguru import logger
 from time import time
 from collections import defaultdict
@@ -140,6 +141,9 @@ class ConvertGraphTypes:
         a_graph_at_t["edge_index"] = edge_tensor
         a_graph_at_t["node_num"].append(dglG.num_nodes())
         a_graph_at_t["edge_num"].append(dglG.num_edges())
+        a_graph_at_t["indices_subnodes"] = torch.Tensor(
+            [k for k in range(dglG.num_nodes())]
+        ).int()
         a_graph_at_t["mapping_from_orig_to_subgraphs"] = {
             k: [k] for k in range(dglG.num_nodes())
         }
@@ -163,9 +167,14 @@ class ConvertGraphTypes:
         )
 
         st = time()
+        a_graph_at_t = defaultdict(list)
         # extract subgraphs with edge
         for partition_id, indices_subnodes in comm_group.items():
             subgraph = dgl.node_subgraph(dglG, indices_subnodes)
+            a_graph_at_t["indices_subnodes"].append(
+                torch.Tensor(indices_subnodes).int()
+            )
+            # self._lap_eig(subgraph)
             subgraph_list.append(subgraph)
             for i in indices_subnodes:
                 mapping_from_orig_to_subgraphs[i] = [node_data_index]
@@ -173,7 +182,6 @@ class ConvertGraphTypes:
         # logger.info(">" * 10, "time for extracting subgraphs with edge:", time() - st)
 
         st = time()
-        a_graph_at_t = defaultdict(list)
         for subgraph in subgraph_list:
             a_graph_at_t["node_data"].append(subgraph.ndata["w"])
             a_graph_at_t["edge_data"].append(subgraph.edata["w"])
@@ -246,3 +254,48 @@ class ConvertGraphTypes:
             comm[comm_id] = deactivated_nodes[i : i + size]
             comm_id += 1
         return comm
+
+    def _eig(self, sym_mat):
+        sym_mat = sym_mat.to_dense()
+        # (sorted) eigenvectors with torch
+        eigval, eigvec = torch.linalg.eigh(sym_mat)
+        # for eigval, take abs because torch sometimes computes the first eigenvalue approaching 0 from the negative
+        eigvec = eigvec.float()  # [N, N (channels)]
+        eigval = torch.sort(torch.abs(torch.real(eigval)))[0]  # [N (channels),]
+        return eigvec, eigval  # [N, N (channels)]  [N (channels),]
+
+    def _lap_eig(self, dglG, sparse=True):
+        dgl_adj = dglG.adj()
+        number_of_nodes = dgl_adj.indices().unique().shape[0]
+        in_degree = dgl_adj.long().sum(dim=1).view(-1)
+        if sparse:
+            At = torch.sparse_coo_tensor(
+                dgl_adj.indices(), dgl_adj.val, dgl_adj.shape, device=dgl_adj.device
+            )
+            diagF = self.create_sparse_diag
+        else:
+            At = dgl_adj.to_dense()
+            diagF = torch.diag
+
+        At = At.detach().float()
+        in_degree = in_degree.detach().float()
+        # Laplacian
+        A = At
+        N = diagF(torch.clip(in_degree, min=1) ** -0.5)
+        L = diagF(in_degree.fill_(1.0)) - torch.matmul(torch.matmul(N, A), N)
+        eigvec, eigval = self._eig(L)
+        return eigvec, eigval  # [N, N (channels)]  [N (channels),]
+
+    def create_sparse_diag(self, values):
+        n = values.shape[0]
+
+        # 대각 행렬의 인덱스 생성 (대각 원소의 위치)
+        indices = torch.arange(n, dtype=torch.long, device=values.device)
+        indices = torch.stack([indices, indices])
+
+        # COO Tensor 생성
+        diag_coo = torch.sparse_coo_tensor(
+            indices=indices, values=values, size=(n, n), device=values.device
+        )
+
+        return diag_coo
