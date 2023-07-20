@@ -120,6 +120,7 @@ class Runner(object):
                         "Train AUC": test_results[1],
                         "Val AUC": test_results[2],
                         "Test AUC": test_results[3],
+                        "lr": self.optimizer.param_groups[0]["lr"],
                     }
                 )
 

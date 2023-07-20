@@ -157,6 +157,7 @@ class DGNNLayer(nn.Module):
         causal_hat = scatter(
             res, ei_tar, dim=self.node_dim, dim_size=x_tar.shape[0], reduce=self.aggr
         )  # [N,F]
+        breakpoint()
         spurious_hat = scatter(
             spu, ei_tar, dim=self.node_dim, dim_size=x_tar.shape[0], reduce=self.aggr
         )  # [N,F]

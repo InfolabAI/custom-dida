@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import math
 import dgl
+from torch_scatter import scatter
 from loguru import logger
 from time import time
 from tqdm import tqdm
@@ -128,6 +129,12 @@ class OurModel(nn.Module):
         self.args = args
         self.attention = Attention(args, num_nodes)
         self.cs_decoder = MultiplyPredictor()
+        self.update_norm = nn.LayerNorm(args.encoder_embed_dim)
+        self.cs_mlp = nn.Sequential(
+            nn.Linear(args.encoder_embed_dim, 2 * args.encoder_embed_dim),
+            nn.GELU(),
+            nn.Linear(2 * args.encoder_embed_dim, args.encoder_embed_dim),
+        )
 
         self.trainer = TrainerOurs(args, self, data_to_prepare)
         self.tester = TesterOurs(args, self, data_to_prepare)
@@ -177,22 +184,13 @@ class OurModel(nn.Module):
 
         self.embeddings = embeddings
 
-    def _get_tr_input(self, dglG):
+    def _get_tr_input(self, list_of_dgl_graphs):
         """
-        - dglG 를 TrInputDict 로 변환하는 함수
-
-        Parameters
-        ----------
-        dglG: dgl graph
+        - list_of_dgl_graphs 를 TrInputDict (a set of subgraphs) 로 변환
+            - subgraph_t == activated nodes at t
         """
-        dglG = dglG.to(self.args.device)
-        if self.args.dont_use_subgraph:
-            a_graph_at_t = self.cgt.dglG_to_TrInputDict_NoSubgraphs(dglG)
-        else:
-            a_graph_at_t = self.cgt.dglG_to_TrInputDict(
-                dglG, self.args.minnum_nodes_for_a_community
-            )
-        return a_graph_at_t
+        tr_input = self.cgt.dglG_list_to_TrInputDict(list_of_dgl_graphs)
+        return tr_input
 
     def _get_actions(self, list_of_dgl_graphs):
         """(DEPRECATED)
@@ -273,17 +271,43 @@ class OurModel(nn.Module):
 
         return augmented_graphs
 
-    def forward(self, list_of_dgl_graphs, t, epoch, is_train):
+    def forward(self, list_of_dgl_graphs, epoch, is_train):
         if epoch == 1 or self.args.propagate != "dyaug":
-            dglG = list_of_dgl_graphs[t]
+            pass
         else:
-            if t == 0 and is_train:
-                self._get_graph_embeddings(list_of_dgl_graphs)
-            dglG = self._get_augmented_graph(list_of_dgl_graphs, t)
+            pass
+            # if t == 0 and is_train:
+            #    self._get_graph_embeddings(list_of_dgl_graphs)
+            # dglG = self._get_augmented_graph(list_of_dgl_graphs, t)
 
-        graph = self._get_tr_input(dglG)
+        tr_input = self._get_tr_input(list_of_dgl_graphs)
 
         st = time()
-        embedding = self.main_model(graph)
+        # [sum(activated_nodes) of all the timestamps, embed_dim]
+        embedding = self.main_model(tr_input, get_embedding=True)
+
+        offset = 0
+        t_embeddings = []
+        for node_num, activated_indices in zip(
+            tr_input["node_num"], tr_input["indices_subnodes"]
+        ):
+            # t_activated_embedding.size == [#nodes at t, embed_dim]
+            t_activated_embedding = scatter(
+                # [#activated nodes at t, embed_dim]
+                embedding[offset : offset + node_num],
+                activated_indices.long().to(self.args.device),
+                dim=0,
+                dim_size=self.args.num_nodes,
+                reduce="add",
+            )
+            offset += node_num
+
+            # node_features are the same across all the timestamps, so, we use [0]
+            t_node_feature = list_of_dgl_graphs[0].ndata["w"]
+            t_embedding = self.cs_mlp(
+                self.update_norm(t_activated_embedding + t_node_feature)
+            )
+            t_embeddings.append(self.cs_mlp(self.update_norm(t_embedding)))
+
         self.args.debug_logger.loguru(f"main_model", time() - st, 1000)
-        return embedding
+        return t_embeddings

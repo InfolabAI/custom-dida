@@ -9,17 +9,11 @@ logger.critical(
 
 parser = argparse.ArgumentParser()
 # Transformer
-# embed_dim 은 32 이하로 낮아지면 memory 사용량에 큰 영향을 주지는 않는데, 32 이하로 낮아지면 AUC 는 낮아지는 경향이 있음
 parser.add_argument("--encoder_embed_dim", type=int, default=32)
 parser.add_argument("--encoder_ffn_embed_dim", type=int, default=32)
 # layer 는 memory 사용량에 embed_dim 보다는 큰 영향이 있음
 parser.add_argument("--encoder_layers", type=int, default=3)
-parser.add_argument("--encoder_attention_heads", type=int, default=4)
-parser.add_argument(
-    "--dont_use_subgraph",
-    action="store_true",
-    help="If you input '--dont_use_subgraph', the model doesn't use subgraph",
-)
+parser.add_argument("--encoder_attention_heads", type=int, default=16)
 
 
 # dataset

@@ -133,12 +133,12 @@ class ConvertGraphTypes:
 
     def dglG_list_to_TrInputDict(self, list_of_dgl_graphs):
         comm = self._get_activated_communities(list_of_dgl_graphs)
-        tr_input = {}
+        tr_input = defaultdict(list)
         node_data_index = 0
         subgraph_list = []
         for t, activated_nodes in comm.items():
             # t 에 대해 comm 과 list_of_dgl_graphs 를 sync 하여 subgraph 를 생성
-            subgraph = list_of_dgl_graphs[t].node_subgraph(activated_nodes)
+            subgraph = dgl.node_subgraph(list_of_dgl_graphs[t], activated_nodes)
             tr_input["indices_subnodes"].append(torch.Tensor(activated_nodes).int())
             subgraph_list.append(subgraph)
 
@@ -155,6 +155,7 @@ class ConvertGraphTypes:
         tr_input["node_data"] = torch.concat(tr_input["node_data"])
         tr_input["edge_data"] = torch.concat(tr_input["edge_data"])
         tr_input["edge_index"] = torch.concat(tr_input["edge_index"], dim=1)
+
         return tr_input
 
     # TODO 삭제 필요
@@ -248,7 +249,7 @@ class ConvertGraphTypes:
             activated_node_indices = torch.concat(dglG.edges()).unique().tolist()
             comm[t] = activated_node_indices
 
-        return
+        return comm
 
     def _get_simple_communities(
         self, activated_node_indices: list, num_entire_nodes: int, minnum_nodes: int
