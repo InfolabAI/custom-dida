@@ -3,6 +3,9 @@ import torch
 from loguru import logger
 from utils_main import setargs
 
+logger.critical(
+    "You should set appropriate --warmup-updates and --total-num-update for polynomial_decay (lr)"
+)
 
 parser = argparse.ArgumentParser()
 # Transformer

@@ -21,7 +21,8 @@ class TrainerOurs(TrainerAndTester):
 
         args = self.runnerProperty.args
         self.model.train()
-        optimizer = self.runnerProperty.optimizer
+        optimizer = self.runnerProperty.scheduler.optimizer
+        scheduler = self.runnerProperty.scheduler
 
         edge_index = []
         edge_label = []
@@ -60,7 +61,7 @@ class TrainerOurs(TrainerAndTester):
             optimizer.zero_grad()
             loss.backward()
             # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
-            optimizer.step()
+            scheduler.step()
             epoch_losses.append(loss.detach().item())
             if self.args.loguru_level == "DEBUG":
                 for name, param in self.model.named_parameters():

@@ -1,5 +1,6 @@
 import time
 import torch.optim as optim
+from model_ours.modules.lr import PolynomialDecayLR
 from utils_main import *
 from loguru import logger
 from loss import EnvLoss
@@ -8,7 +9,18 @@ from tqdm import tqdm
 
 class RunnerProperty:
     def __init__(
-        self, args, data, writer, len, len_train, len_val, len_test, loss, x, optimizer
+        self,
+        args,
+        data,
+        writer,
+        len,
+        len_train,
+        len_val,
+        len_test,
+        loss,
+        x,
+        optimizer,
+        scheduler,
     ):
         self.args = args
         self.data = data
@@ -20,6 +32,36 @@ class RunnerProperty:
         self.loss = loss
         self.x = x
         self.optimizer = optimizer
+        self.scheduler = scheduler
+
+
+def set_optimizer(args, model):
+    if args.model == "dida":
+        return (
+            optim.Adam(
+                [p for n, p in model.named_parameters() if "ss" not in n],
+                lr=args.lr,
+                weight_decay=args.weight_decay,
+            ),
+            None,
+        )
+    elif args.model == "ours":
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=args.lr_tg,
+            weight_decay=args.weight_decay_tg,
+        )
+        scheduler = PolynomialDecayLR(
+            optimizer,
+            warmup_updates=args.warmup_updates,
+            tot_updates=args.total_num_update,
+            lr=args.lr_tg,
+            end_lr=args.end_learning_rate,
+            power=args.power,
+        )
+        return optimizer, scheduler
+    else:
+        raise NotImplementedError
 
 
 class Runner(object):
@@ -35,11 +77,7 @@ class Runner(object):
         x = data["x"].to(args.device)
         self.x = [x for _ in range(self.len)] if len(x.shape) <= 2 else x
         self.loss = EnvLoss(args)
-        self.optimizer = optim.Adam(
-            [p for n, p in model.named_parameters() if "ss" not in n],
-            lr=args.lr,
-            weight_decay=args.weight_decay,
-        )
+        self.optimizer, self.scheduler = set_optimizer(args, model)
         self.model = model
         runnerProperty = RunnerProperty(
             self.args,
@@ -52,6 +90,7 @@ class Runner(object):
             self.loss,
             self.x,
             self.optimizer,
+            self.scheduler,
         )
         self.model.trainer.setRunnerProperty(runnerProperty)
         self.model.tester.setRunnerProperty(runnerProperty)
