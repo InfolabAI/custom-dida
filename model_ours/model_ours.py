@@ -77,17 +77,17 @@ class Attention(nn.Module):
         inputs = self.stem(inputs.transpose(1, 2)).squeeze(2)
         # positional encoding. self.pe.shape == [max_position, embed_dim]
         inputs = inputs + self.pe[: inputs.shape[0]]
-        # [t, embed_dim] -> [1, t, embed_dim]
-        inputs = inputs.unsqueeze(0)
+        # [t, embed_dim] -> [t, 1, embed_dim]
+        inputs = inputs.unsqueeze(1)
         # attn [1, t, embed_dim], attn_weights [t, 1, 1]
         attn, attn_weights = self.attention(
             query=inputs, key=inputs, value=inputs, attn_bias=None
         )
-        # [1, t, embed_dim] -> [t, embed_dim]
-        attn = attn.squeeze(0)
+        # [t, 1, embed_dim] -> [t, embed_dim]
+        attn = attn.squeeze(1)
         # [t, embed_dim] -> [t, 1] -> [1, t]
         attn = self.linear(attn).transpose(0, 1)
-        self.args.debug_logger.histogram("attn", attn.flatten(), 100, attn.shape[1] > 5)
+        # self.args.debug_logger.histogram("attn", attn.flatten(), 5, attn.shape[1] > 5)
         if attn.shape[1] > 1 and self.args.alpha_std == 1:
             attn = attn / (attn.std() + 1e-8)
         # [1, t] -> [t]
@@ -144,8 +144,10 @@ class OurModel(nn.Module):
 
         # actions for t=1 (action for t=0), t=2 (actions for t=1, 0), t=3 (actions for t=2, 1, 0), ...
         action = self._get_action(self.embeddings, t)
-        self.args.debug_logger.histogram("action", action, 100, len(action) > 5)
-        self.args.debug_logger.loguru(f"action", action, 100, len(action) > 5)
+        if len(action) > 5:
+            logger.debug(f"action: {action}")
+        # self.args.debug_logger.histogram("action", action, 5, len(action) > 5)
+        # self.args.debug_logger.loguru(f"action", action, 5, len(action) > 5)
         # NOTE [::-1] reversed indices to sync this to action
         sublist_of_dgl_graphs = list_of_dgl_graphs[:t][::-1]
         cur_graph = list_of_dgl_graphs[t]

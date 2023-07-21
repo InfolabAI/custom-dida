@@ -14,7 +14,7 @@ parser.add_argument("--encoder_embed_dim", type=int, default=32)
 parser.add_argument("--encoder_ffn_embed_dim", type=int, default=32)
 # layer 는 memory 사용량에 embed_dim 보다는 큰 영향이 있음
 parser.add_argument("--encoder_layers", type=int, default=3)
-parser.add_argument("--encoder_attention_heads", type=int, default=4)
+parser.add_argument("--encoder_attention_heads", type=int, default=16)
 parser.add_argument(
     "--dont_use_subgraph",
     action="store_true",

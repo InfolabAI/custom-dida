@@ -29,7 +29,10 @@ class TrainerOurs(TrainerAndTester):
         epoch_losses = []
 
         for t in tqdm(
-            range(self.runnerProperty.len_train - 1), desc="Training", leave=False
+            range(self.runnerProperty.len_train - 1),
+            desc="Training",
+            leave=False,
+            postfix={"lr": f"{optimizer.param_groups[0]['lr']}"},
         ):
             z = self.model(data, t, epoch, is_train=True)
 
@@ -60,10 +63,12 @@ class TrainerOurs(TrainerAndTester):
             st = time.time()
             optimizer.zero_grad()
             loss.backward()
-            # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip_norm)
             scheduler.step()
             epoch_losses.append(loss.detach().item())
-            if self.args.loguru_level == "DEBUG":
+            if self.args.loguru_level == "DEBUG" and (
+                self.args.total_step % 500 == 0 or self.args.total_step == 1
+            ):
                 for name, param in self.model.named_parameters():
                     self.runnerProperty.writer.add_histogram(
                         name, param, self.args.total_step
