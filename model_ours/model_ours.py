@@ -50,9 +50,14 @@ class CustomMultiheadAttention(MultiheadAttention):
         )
         # mean of multi-heads [batch_size (1) * num_heads, T, T] -> [T, T]
         attn_probs = attn_probs.mean(0)
+        # 평균보다 낮은 attention 은 mask(모델이 선택과 집중을 하도록)
+        attn_probs[attn_probs < 1 / attn_probs.shape[0]] = 0
         # lower triangular matrix [T, T]
         mask = torch.tril(torch.ones_like(attn_probs).to(attn_probs.device))
+        # 대각선은 1(t 자신의 adj 에 대해서는 attention 보장)
+        attn_probs += torch.eye(attn_probs.shape[0], device=attn_probs.device)
         attn_probs = attn_probs * mask
+        logger.debug(f"#nonzero attn_probs: {attn_probs.nonzero().shape[0]}")
 
         # get At_stack [T, #nodes, #nodes]
         At_stack = torch.stack(
