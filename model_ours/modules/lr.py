@@ -27,7 +27,7 @@ class PolynomialDecayLR(_LRScheduler):
     def step(self):
         self.optimizer.step()
         super().step()
-        logger.debug(f"lr: {self.get_lr()}")
+        # logger.debug(f"lr: {self.get_lr()}")
 
     def get_lr(self):
         # warmup_updates 보다 작으면 시작 lr 고정

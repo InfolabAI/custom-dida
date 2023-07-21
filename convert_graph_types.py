@@ -229,6 +229,11 @@ class ConvertGraphTypes:
         indices_to_be_removed = adj.values().sort(descending=True)[1][
             int(edge_number_limitation) :
         ]
+        # 0 value 인 edge 도 모두 제거하도록 indices 추가
+        indices_to_be_removed = torch.concat(
+            [indices_to_be_removed, torch.where(adj.values() == 0)[0]]
+        )
+
         graph = dgl.graph(
             (indices[0, :], indices[1, :]), num_nodes=node_features.shape[0]
         )

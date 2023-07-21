@@ -21,7 +21,7 @@ class TrainerOurs(TrainerAndTester):
 
         args = self.runnerProperty.args
         self.model.train()
-        optimizer = self.runnerProperty.scheduler.optimizer
+        optimizer = self.runnerProperty.optimizer
         scheduler = self.runnerProperty.scheduler
 
         embeddings = self.model(
@@ -67,21 +67,17 @@ class TrainerOurs(TrainerAndTester):
         cy = cal_y(embeddings, self.model.cs_decoder)
         loss = cal_loss(cy, edge_label)
 
-        optimizer.zero_grad()
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
         loss.backward()
         # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
-        scheduler.step()
-        if self.args.loguru_level == "DEBUG":
+        scheduler[0].step()
+        scheduler[1].step()
+        if self.args.loguru_level == "DEBUG" and (epoch % 50 == 0 or epoch == 1):
             for name, param in self.model.named_parameters():
-                self.runnerProperty.writer.add_histogram(
-                    name, param, self.args.total_step
-                )
-        self.args.debug_logger.loguru(
-            f"GPU usage",
-            f"{get_gpu_memory_usage(self.args.device_id)} MiB",
-            1000,
-        )
-        self.args.total_step += 1
+                # self.runnerProperty.writer.add_histogram( name, param, self.args.total_step)
+                logger.debug(f"{name} {param.std()}")
+        # self.args.debug_logger.loguru( f"GPU usage", f"{get_gpu_memory_usage(self.args.device_id)} MiB", 1000,)
 
         average_epoch_loss = loss.detach().item()
         self.runnerProperty.writer.add_scalar("epoch_loss", loss.detach().cpu(), epoch)

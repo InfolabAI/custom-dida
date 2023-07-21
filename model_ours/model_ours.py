@@ -24,78 +24,129 @@ class MultiplyPredictor(torch.nn.Module):
         return torch.sigmoid(x)
 
 
+class CustomMultiheadAttention(MultiheadAttention):
+    def __init__(
+        self,
+        embed_dim,
+        num_heads,
+        attention_dropout,
+    ):
+        super().__init__(
+            embed_dim,
+            num_heads,
+            attention_dropout=attention_dropout,
+            self_attention=True,
+        )
+
+    def forward(self, query, value: list):
+        """
+        Parameters
+        ----------
+        query: [t, 1, embed_dim]
+        value: list of dgl.graph
+        """
+        attn_probs = super().forward(
+            query, query, query, ret_attn_probs=True, attn_bias=None
+        )
+        # mean of multi-heads [batch_size (1) * num_heads, T, T] -> [T, T]
+        attn_probs = attn_probs.mean(0)
+        # lower triangular matrix [T, T]
+        mask = torch.tril(torch.ones_like(attn_probs).to(attn_probs.device))
+        attn_probs = attn_probs * mask
+
+        # get At_stack [T, #nodes, #nodes]
+        At_stack = torch.stack(
+            [
+                torch.sparse_coo_tensor(
+                    G.adj().indices(), G.adj().val, G.adj().shape, device=G.adj().device
+                )
+                for G in value
+            ]
+        )
+
+        new_At_list = []
+        for attn in attn_probs:
+            # attn [T]
+            new_At = self._propagate_edge(value, attn)
+            new_At_list.append(new_At)
+
+        return new_At_list
+
+    def _propagate_edge(self, list_of_dgl_graphs, attn):
+        """
+        Parameters
+        ----------
+        list_of_dgl_graphs: list of dgl.graph
+        """
+        # reverse list_of_dgl_graphs
+        new_At = None
+        for graph, a_attn in zip(list_of_dgl_graphs, attn):
+            if float(a_attn.cpu().detach()) == 0:
+                continue
+            At = graph.adj()
+            At = torch.sparse_coo_tensor(
+                At.indices(), At.val, At.shape, device=At.device
+            )
+            if new_At is None:
+                new_At = At * a_attn
+            else:
+                new_At += At * a_attn
+                # comm_At = comm_At.matmul(At * action)
+
+        if new_At is None:
+            breakpoint()
+
+        return new_At
+
+
 class Attention(nn.Module):
     def __init__(self, args, num_nodes):
         super().__init__()
         self.args = args
-        self.stem = nn.Sequential(
-            nn.Linear(num_nodes, 1),
+        self.mlp_in = nn.Sequential(
+            nn.Linear(args.encoder_embed_dim, args.encoder_embed_dim * 2),
+            nn.ReLU(),
+        )
+        self.mlp_out = nn.Sequential(
+            nn.Linear(args.encoder_embed_dim * 2, args.encoder_embed_dim),
             nn.ReLU(),
         )
         # self.bn1 = nn.BatchNorm1d(tokengt_args.encoder_embed_dim)
         # self.bn2 = nn.BatchNorm1d(tokengt_args.encoder_embed_dim)
-        self.attention = MultiheadAttention(
+        self.attention = CustomMultiheadAttention(
             args.encoder_embed_dim,
             args.encoder_attention_heads,
             attention_dropout=args.attention_dropout,
-            dropout=args.dropout,
-            self_attention=True,
         )
         self.linear = nn.Linear(args.encoder_embed_dim, 1)
         self.load_positional_encoding(args.encoder_embed_dim, 1000, args.device)
 
-    def forward(self, embeddings):
+    def forward(self, list_of_embeddings, list_of_dgl_graphs):
         """
         Parameters
         ----------
-        embeddings: torch.tensor, shape [num_nodes, embed_dim]: 가장 마지막이 가장 최신 t 의 embedding 이라 가정함
-
-        History
-        -------
-        - embedding 1개 [#nodes, embed_dim] -> [embed_dim, #nodes] -pooling-> [embed_dim] -모든 embedding stack-> [1, t, embed_dim] -self.attention-> [1, t, embed_dim] -squeeze-> [t, embed_dim] -linear-> [t, 1] -squeeze-> [t]
-            - 이렇게 pooling 을 먼저 하면 정보의 손실이 커서 그런지 학습할수록 self.attention weight 는 0에 수렴하고, 모든 action 이 같은 값이 됨
-        - embedding 1개 [#nodes, embed_dim] -모든 embedding stack, t()-> [t, embed_dim, #nodes] -linear, relu-> [t, embed_dim, 1] -t(), self.attention-> [1, t, embed_dim] -squeeze-> [t, embed_dim] -linear-> [t, 1] -squeeze-> [t]
-            - pooing 으로 인한 정보손실을 줄이기 위해 linear 로 대체했지만, 동일한 문제 발생
-        - 위와 동일한 상태에서 [t, embed_dim] 에 대해 batchnorm1d(embed_dim) 추가
-            - 동일한 문제 발생
-        - alpha 을 이용하는 연산을 adjacenty matrix 간 a_1*At_1 + a_2*At_2 가 아니라 (a_2*At_2).matmul(a_1*At_1) 로 변환
-            - 동일한 문제 발생
-        - positional encoding 추가
-            - 동일한 문제 발생
-        - alpha 에 sigmoid 가 아닌 softmax 사용
-            - 동일한 문제 발생
-        - collab 뿐 아니라 yelp 에 대해 실험 수행
-            - 동일한 문제 발생
+        list_of_embeddings: list of torch.tensor from self.main_model over entier timestamps [[#activated nodes, embed_dim], ...]
         """
         inputs = []
-        # NOTE reversed 가 중요 action 은 t-1, t-2 순으로 나와야 함
-        for i in reversed(range(len(embeddings))):
-            inputs.append(embeddings[i])
+        for em in list_of_embeddings:
+            # [#activated nodes, embed_dim] -> [#activated nodes, embed_dim*2]
+            em = self.mlp_in(em)
+            # [#activated nodes, embed_dim*2] -> [embed_dim*2, #activated nodes] -> [embed_dim*2, 1]
+            em = torch.nn.functional.adaptive_avg_pool1d(
+                em.transpose(0, 1), 1
+            ) + torch.nn.functional.adaptive_max_pool1d(em.transpose(0, 1), 1)
+            # [embed_dim*2, 1] -> [1, embed_dim*2] -> [1, embed_dim] -> [embed_dim]
+            em = self.mlp_out(em.transpose(0, 1)).squeeze(0)
+            inputs.append(em)
 
-        # [t, #nodes, embed_dim]
+        # [t, embed_dim]
         inputs = torch.stack(inputs, dim=0)
-        # [t, #nodes, embed_dim] -> [t, embed_dim, #nodes] -> [t, embed_dim, 1] -> [t, embed_dim]
-        inputs = self.stem(inputs.transpose(1, 2)).squeeze(2)
         # positional encoding. self.pe.shape == [max_position, embed_dim]
         inputs = inputs + self.pe[: inputs.shape[0]]
-        # [t, embed_dim] -> [1, t, embed_dim]
-        inputs = inputs.unsqueeze(0)
-        # attn [1, t, embed_dim], attn_weights [t, 1, 1]
-        attn, attn_weights = self.attention(
-            query=inputs, key=inputs, value=inputs, attn_bias=None
-        )
-        # [1, t, embed_dim] -> [t, embed_dim]
-        attn = attn.squeeze(0)
-        # [t, embed_dim] -> [t, 1] -> [1, t]
-        attn = self.linear(attn).transpose(0, 1)
-        self.args.debug_logger.histogram("attn", attn.flatten(), 100, attn.shape[1] > 5)
-        if attn.shape[1] > 1 and self.args.alpha_std == 1:
-            attn = attn / (attn.std() + 1e-8)
-        # [1, t] -> [t]
-        out = torch.nn.functional.softmax(attn, dim=1).squeeze(0)
-
-        # reversed index 에 의한 계산이므로, out[0]==action(t-1), out[1]==action(t-2), ...
-        return out
+        # [t, embed_dim] -> [t, 1, embed_dim]
+        inputs = inputs.unsqueeze(1)
+        # [t, 1, embed_dim] -> propagated_list_of_dgl_graphs
+        return self.attention(query=inputs, value=list_of_dgl_graphs)
 
     def load_positional_encoding(self, dim_feature=1, max_position=1000, device="cpu"):
         """
@@ -129,8 +180,8 @@ class OurModel(nn.Module):
         self.args = args
         self.attention = Attention(args, num_nodes)
         self.cs_decoder = MultiplyPredictor()
-        self.update_norm = nn.LayerNorm(args.encoder_embed_dim)
-        self.cs_mlp = nn.Sequential(
+        self.layer_norm = nn.LayerNorm(args.encoder_embed_dim)
+        self.mlp = nn.Sequential(
             nn.Linear(args.encoder_embed_dim, 2 * args.encoder_embed_dim),
             nn.GELU(),
             nn.Linear(2 * args.encoder_embed_dim, args.encoder_embed_dim),
@@ -141,49 +192,6 @@ class OurModel(nn.Module):
         self.cgt = ConvertGraphTypes()
         self.embeddings = None
 
-    def _get_augmented_graph(self, list_of_dgl_graphs, t):
-        """
-        한번에 하나의 t에 대해 new graph 를 구하는 함수"""
-        if t == 0:
-            return list_of_dgl_graphs[0]
-
-        assert self.embeddings is not None, "get_graph_embeddings 를 먼저 실행해야 함"
-
-        # actions for t=1 (action for t=0), t=2 (actions for t=1, 0), t=3 (actions for t=2, 1, 0), ...
-        action = self._get_action(self.embeddings, t)
-        self.args.debug_logger.histogram("action", action, 100, len(action) > 5)
-        self.args.debug_logger.loguru(f"action", action, 100, len(action) > 5)
-        # NOTE [::-1] reversed indices to sync this to action
-        sublist_of_dgl_graphs = list_of_dgl_graphs[:t][::-1]
-        cur_graph = list_of_dgl_graphs[t]
-        augmented_graph = self._get_propagated_graph(
-            sublist_of_dgl_graphs, action, cur_graph
-        )
-
-        return augmented_graph
-
-    def _get_graph_embeddings(self, list_of_dgl_graphs):
-        """
-        모든 t 의 original graph 에 대해 embedding 을 구하는 함수
-        한번에 구하는 것이 필요한 이유는 t 에 대한 action 을 구하기 위해, t-1, t-2, ... 의 embedding 이 필요하기 때문
-        """
-        embeddings = []
-        with torch.no_grad():
-            for t, dglG in tqdm(
-                enumerate(list_of_dgl_graphs),
-                desc="get_graph_embeddings",
-                total=len(list_of_dgl_graphs),
-                leave=False,
-            ):
-                st = time()
-                a_graph_at_t = self._get_tr_input(dglG)
-                self.args.debug_logger.loguru(f"get_tr_input", time() - st, 1000)
-                st = time()
-                embeddings.append(self.main_model(a_graph_at_t, get_embedding=True))
-                self.args.debug_logger.loguru(f"main_model_time", time() - st, 1000)
-
-        self.embeddings = embeddings
-
     def _get_tr_input(self, list_of_dgl_graphs):
         """
         - list_of_dgl_graphs 를 TrInputDict (a set of subgraphs) 로 변환
@@ -192,109 +200,58 @@ class OurModel(nn.Module):
         tr_input = self.cgt.dglG_list_to_TrInputDict(list_of_dgl_graphs)
         return tr_input
 
-    def _get_actions(self, list_of_dgl_graphs):
+    def _get_propagated_graphs(self, list_of_dgl_graphs):
         """(DEPRECATED)
-        한번에 모든 t에 대해 action 을 구하는 함수"""
-        embeddings = self.get_graph_embeddings(list_of_dgl_graphs)
-        action_list = []
-        for t in range(1, len(embeddings) - 1):
-            action_list.append(self.attention(embeddings[:t]))
-        return action_list
+        한번에 모든 t에 대해 propagated graph 를 구하는 함수"""
+        with torch.no_grad():
+            tr_input = self._get_tr_input(list_of_dgl_graphs)
+            # [sum(activated_nodes) of all the timestamps, embed_dim]
+            embeddings = self.main_model(tr_input, get_embedding=True)
 
-    def _get_action(self, entier_embeddings, t):
-        """
-        한번에 하나의 t에 대해 {t-1, t-2, ...} action 을 구하는 함수
-        Parameters
-        ----------
-        entier_embeddings: list of torch.tensor from self.main_model over entier timestamps
-        """
-        return self.attention(entier_embeddings[:t])
+        list_of_embeddings = []
+        offset = 0
+        for node_num in tr_input["node_num"]:
+            list_of_embeddings.append(embeddings[offset : offset + node_num])
+            offset += node_num
 
-    def _get_propagated_graph(
-        self, sublist_of_dgl_graphs, actions, cur_graph, edge_number_limit_ratio=1.5
-    ):
-        """
-        Parameters
-        ----------
-        sublist_of_dgl_graphs: list of dgl.graph
-        actions: list of int: For t, actions means action for t-1, t-2, ..., 0
-        cur_graph: dgl.graph
-        edge_number_limit_ratio: float: If this is set to 1.5, the number of augmented edges are limited to 1.5 times of the number of original edges
-        """
-        # reverse list_of_dgl_graphs
-        comm_At = None
-        for graph, action in zip(sublist_of_dgl_graphs, actions):
-            At = graph.adj()
-            At = torch.sparse_coo_tensor(
-                At.indices(), At.val, At.shape, device=At.device
+        new_At_list = self.attention(list_of_embeddings, list_of_dgl_graphs)
+
+        propagated_list_of_dgl_graphs = []
+        for new_At, ori_dglG in zip(new_At_list, list_of_dgl_graphs):
+            # attn [T] -> [T, 1, 1], then [T, 1, 1] * [T, #nodes, #nodes], then [T, #nodes, #nodes] -> [#nodes, #nodes]
+            new_graph = self.cgt.weighted_adjacency_to_graph(
+                new_At,
+                # 사실 모든 ori_dglG 는 같은 ndata 를 가지고 있어서 [0]번째 nddata 를 게속 써도 상관없음
+                ori_dglG.ndata["w"],
+                # original edge num 의 1.5 배까지로 제한
+                ori_dglG.adj().nnz * 1.5,
             )
-            if comm_At is None:
-                comm_At = At * action
-            else:
-                comm_At += At * action
-                # comm_At = comm_At.matmul(At * action)
+            propagated_list_of_dgl_graphs.append(new_graph)
 
-        cur_adj = cur_graph.adj()
-        cur_At = torch.sparse_coo_tensor(
-            cur_adj.indices(), cur_adj.val, cur_adj.shape, device=cur_adj.device
-        )
-        cur_At = cur_At + comm_At
-        new_graph = self.cgt.weighted_adjacency_to_graph(
-            cur_At.transpose(1, 0).coalesce(),
-            cur_graph.ndata["w"],
-            cur_adj.nnz * edge_number_limit_ratio,
-        )
-        self.args.debug_logger.scalar(
-            f"Ratio of #orig_edges to $aug_edges", new_graph.adj().nnz / cur_adj.nnz, 1
-        )
-        return new_graph
-
-    def get_augmented_graphs(self, list_of_dgl_graphs):
-        """(DEPRECATED)
-        한번에 모든 t에 대해 augmented graph 를 구하는 함수"""
-        # deprecated
-        # actions for t=1 (action for t=0), t=2 (actions for t=1, 0), t=3 (actions for t=2, 1, 0), ...
-        action_list = self._get_actions(list_of_dgl_graphs)
-        t = 1
-        augmented_graphs = [list_of_dgl_graphs[0]]
-
-        for actions in action_list:
-            # [::-1] reversed indices
-            sublist_of_dgl_graphs = list_of_dgl_graphs[:t][::-1]
-            cur_graph = list_of_dgl_graphs[t]
-            new_graph = self._get_propagated_graph(
-                sublist_of_dgl_graphs, actions, cur_graph
-            )
-            augmented_graphs.append(new_graph)
-
-            t += 1
-
-        return augmented_graphs
+        return propagated_list_of_dgl_graphs
 
     def forward(self, list_of_dgl_graphs, epoch, is_train):
-        if epoch == 1 or self.args.propagate != "dyaug":
+        if self.args.propagate != "dyaug":
             pass
         else:
-            pass
-            # if t == 0 and is_train:
-            #    self._get_graph_embeddings(list_of_dgl_graphs)
-            # dglG = self._get_augmented_graph(list_of_dgl_graphs, t)
+            propagated_list_of_dgl_graphs = self._get_propagated_graphs(
+                list_of_dgl_graphs
+            )
+            list_of_dgl_graphs = propagated_list_of_dgl_graphs
 
         tr_input = self._get_tr_input(list_of_dgl_graphs)
-
-        st = time()
         # [sum(activated_nodes) of all the timestamps, embed_dim]
-        embedding = self.main_model(tr_input, get_embedding=True)
+        embeddings = self.main_model(tr_input, get_embedding=True)
 
         offset = 0
-        t_embeddings = []
+        t_entire_embeddings = []
         for node_num, activated_indices in zip(
             tr_input["node_num"], tr_input["indices_subnodes"]
         ):
             # t_activated_embedding.size == [#nodes at t, embed_dim]
             t_activated_embedding = scatter(
                 # [#activated nodes at t, embed_dim]
-                embedding[offset : offset + node_num],
+                embeddings[offset : offset + node_num],
                 activated_indices.long().to(self.args.device),
                 dim=0,
                 dim_size=self.args.num_nodes,
@@ -304,10 +261,8 @@ class OurModel(nn.Module):
 
             # node_features are the same across all the timestamps, so, we use [0]
             t_node_feature = list_of_dgl_graphs[0].ndata["w"]
-            t_embedding = self.cs_mlp(
-                self.update_norm(t_activated_embedding + t_node_feature)
+            t_embedding = self.mlp(
+                self.layer_norm(t_activated_embedding + t_node_feature)
             )
-            t_embeddings.append(self.cs_mlp(self.update_norm(t_embedding)))
-
-        self.args.debug_logger.loguru(f"main_model", time() - st, 1000)
-        return t_embeddings
+            t_entire_embeddings.append(t_embedding)
+        return t_entire_embeddings

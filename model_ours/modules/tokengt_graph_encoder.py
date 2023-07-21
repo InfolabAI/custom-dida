@@ -269,7 +269,7 @@ class TokenGTGraphEncoder(nn.Module):
                 padded_node_mask,
                 padded_edge_mask,
             ) = self.graph_feature(batched_data, perturb)
-        logger.debug(f"ET [graph_feature]: {time.time() - st:.5f}")
+        # logger.debug(f"ET [graph_feature]: {time.time() - st:.5f}")
 
         # x: B x T x C
 
@@ -314,5 +314,5 @@ class TokenGTGraphEncoder(nn.Module):
         # restore node_features (i.e., batched_data['node_data'])
         # x: T x B x C -> B x T x C -> (node_num) x C
         node_data = x.transpose(0, 1)[padded_node_mask, :]
-        logger.debug(f"ET [pure forward]: {time.time() - st:.5f}")
+        # logger.debug(f"ET [pure forward]: {time.time() - st:.5f}")
         return node_data

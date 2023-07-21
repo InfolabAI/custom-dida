@@ -185,9 +185,9 @@ class Trainer_DIDA(TrainerAndTester):
 
         loss = causal_loss + la * penalty
 
-        optimizer.zero_grad()
+        optimizer[0].zero_grad()
         loss.backward()
-        optimizer.step()
+        optimizer[0].step()
         average_epoch_loss = loss.item()
 
         return average_epoch_loss, train_auc_list, val_auc_list, test_auc_list

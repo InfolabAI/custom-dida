@@ -37,29 +37,42 @@ class RunnerProperty:
 
 def set_optimizer(args, model):
     if args.model == "dida":
-        return (
-            optim.Adam(
-                [p for n, p in model.named_parameters() if "ss" not in n],
-                lr=args.lr,
-                weight_decay=args.weight_decay,
-            ),
-            None,
-        )
-    elif args.model == "ours":
         optimizer = optim.Adam(
-            model.parameters(),
-            lr=args.lr_tg,
-            weight_decay=args.weight_decay_tg,
+            [p for n, p in model.named_parameters() if "ss" not in n],
+            lr=args.lr,
+            weight_decay=args.weight_decay,
         )
-        scheduler = PolynomialDecayLR(
-            optimizer,
+        return (optimizer), (None)
+    elif args.model == "ours":
+        # graph attention model
+        optimizer0 = optim.Adam(
+            [p for n, p in model.named_parameters() if n.startswith("attention")],
+            lr=args.lr_tg,
+            weight_decay=0,
+        )
+        scheduler0 = PolynomialDecayLR(
+            optimizer0,
             warmup_updates=args.warmup_updates,
             tot_updates=args.total_num_update,
             lr=args.lr_tg,
             end_lr=args.end_learning_rate,
             power=args.power,
         )
-        return optimizer, scheduler
+        # main model
+        optimizer1 = optim.Adam(
+            [p for n, p in model.named_parameters() if not n.startswith("attention")],
+            lr=args.lr_tg,
+            weight_decay=args.weight_decay_tg,
+        )
+        scheduler1 = PolynomialDecayLR(
+            optimizer1,
+            warmup_updates=args.warmup_updates,
+            tot_updates=args.total_num_update,
+            lr=args.lr_tg,
+            end_lr=args.end_learning_rate,
+            power=args.power,
+        )
+        return (optimizer0, optimizer1), (scheduler0, scheduler1)
     else:
         raise NotImplementedError
 
@@ -120,7 +133,7 @@ class Runner(object):
                         "Train AUC": test_results[1],
                         "Val AUC": test_results[2],
                         "Test AUC": test_results[3],
-                        "lr": self.optimizer.param_groups[0]["lr"],
+                        "lr": self.optimizer[0].param_groups[0]["lr"],
                     }
                 )
 

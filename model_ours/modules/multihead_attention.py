@@ -3,6 +3,7 @@ Modified from https://github.com/microsoft/Graphormer
 """
 
 import math
+from loguru import logger
 from typing import Optional, Tuple
 
 import torch
@@ -118,6 +119,7 @@ class MultiheadAttention(nn.Module):
         attn_mask: Optional[Tensor] = None,
         before_softmax: bool = False,
         need_head_weights: bool = False,
+        ret_attn_probs: bool = False,
     ) -> Tuple[Tensor, Optional[Tensor]]:
         """Input shape: Time x Batch x Channel
 
@@ -150,10 +152,12 @@ class MultiheadAttention(nn.Module):
                 assert value is not None
                 assert src_len, bsz == value.shape[:2]
 
+        # logger.debug( f"query.shape: {query.shape}, key.shape: {key.shape}, value.shape: {value.shape}")
         q = self.q_proj(query)  # [T, B, D]
         k = self.k_proj(query)  # [T, B, D]
         v = self.v_proj(query)  # [T, B, D]
         q *= self.scaling
+        # logger.debug( f"After project, q.shape: {q.shape}, k.shape: {k.shape}, v.shape: {v.shape}")
 
         q = (
             q.contiguous()
@@ -162,6 +166,7 @@ class MultiheadAttention(nn.Module):
         )
         k = k.contiguous().view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
         v = v.contiguous().view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+        # logger.debug( f"After applying multi-heads, q.shape: {q.shape}, k.shape: {k.shape}, v.shape: {v.shape}")
         assert k.size(1) == src_len
 
         # This is part of a workaround to get around fork/join parallelism
@@ -174,6 +179,7 @@ class MultiheadAttention(nn.Module):
             assert key_padding_mask.size(1) == src_len
 
         attn_weights = torch.bmm(q, k.transpose(1, 2))
+        # logger.debug( f"After bmm(q, k.transpose(1, 2)), attn_weights.shape: {attn_weights.shape}")
         attn_weights = self.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
 
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
@@ -203,13 +209,18 @@ class MultiheadAttention(nn.Module):
         if torch.isnan(attn_weights).any():
             breakpoint()
         attn_probs = self.attention_dropout_module(attn_weights)
+        # logger.debug(f"After softmax, attn_probs.shape: {attn_probs.shape}")
+        if ret_attn_probs:
+            return attn_probs
 
         attn = torch.bmm(attn_probs, v)
+        # logger.debug(f"After bmm(attn_probs, v), attn.shape: {attn.shape}")
         assert list(attn.size()) == [bsz * self.num_heads, tgt_len, self.head_dim]
         attn = attn.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
 
         attn = self.out_proj(attn)
         attn = self.dropout_module(attn)
+        # logger.debug(f"After out_proj and dropout, attn.shape: {attn.shape}")
 
         attn_weights: Optional[Tensor] = None
         if need_weights:
