@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import math
+import numpy as np
 from .scatter_and_gather import ScatterAndGather
 from math import ceil
 from .droppath import DropPath
@@ -24,15 +25,16 @@ class CustomMultiheadAttention(MultiheadAttention):
     ):
         comp_dim = 2
         super().__init__(
-            comp_dim,
-            ceil(comp_dim / 2),
+            embed_dim,
+            ceil(embed_dim / 2),
             attention_dropout=attention_dropout,
             self_attention=True,
         )
         self.args = args
         self.drop_path = DropPath(0.1, dim=0)
         self.load_positional_encoding(comp_dim, 1000, args.device)
-        self.scatter_and_gather = ScatterAndGather(args, embed_dim, comp_dim)
+        self.scatter_and_gather1 = ScatterAndGather(args, embed_dim, comp_dim)
+        self.scatter_and_gather2 = ScatterAndGather(args, embed_dim, embed_dim)
         self.step = 0
 
     def forward(self, x, batched_data, padded_node_mask, entire_node_feature):
@@ -59,7 +61,19 @@ class CustomMultiheadAttention(MultiheadAttention):
             self.args.total_step,
         )
         # [#actvated nodes for all the time stamps, embed_dim] -scatter to entire> [#timestamps, #entire nodes, comp_dim]
-        x = self.scatter_and_gather._to_entire(x, batched_data, entire_node_feature)
+        tmpx, entire_activated_indices = self.scatter_and_gather1._to_entire(
+            x, batched_data, entire_node_feature, use_bd=False
+        )
+        sorted_indices = tmpx.mean(2).mean(0).sort(descending=True)[1]
+        intersection = torch.zeros_like(
+            sorted_indices, dtype=torch.bool, device=sorted_indices.device
+        )
+        for el in entire_activated_indices:
+            intersection = intersection | (el == sorted_indices)
+        top_entire_activated_indices = sorted_indices[intersection][:100]
+        x, _ = self.scatter_and_gather2._to_entire(
+            x, batched_data, entire_node_feature, indices=top_entire_activated_indices
+        )
         self.args.debug_logger.writer.add_histogram(
             "X/2. After scattering, x.mean(2).mean(1) of [#timestamps, #entire nodes, comp_dim]",
             x.mean(2).mean(1),
@@ -71,7 +85,7 @@ class CustomMultiheadAttention(MultiheadAttention):
             self.args.total_step,
         )
         # positional encoding. self.pe.shape == [max_position, comp_dim] -> [max_position, 1, comp_dim]
-        x = x + self.pe[: x.shape[0]].unsqueeze(1)
+        # x = x + self.pe[: x.shape[0]].unsqueeze(1)
         # attention map is [#timestamps, #timestamps]
         x, attn = super().forward(x, x, x, attn_bias=None, customize=True)
         self.args.debug_logger.writer.add_histogram(
@@ -85,10 +99,12 @@ class CustomMultiheadAttention(MultiheadAttention):
             self.args.total_step,
         )
         # [#timestamps, #entire nodes, comp_dim] -> [#timestamps(some elementes are dropped), #entire nodes, comp_dim]
-        x = self.drop_path(x)
+        # x = self.drop_path(x)
 
         # [#timestamps, #entire nodes, comp_dim] -gather from entire-> [#actvated nodes for all the time stamps, embed_dim] -indexing-> [#timestamps, #tokens (node + edge), embed_dim]
-        ga = self.scatter_and_gather._from_entire(x, batched_data)
+        ga = self.scatter_and_gather2._from_entire(
+            x, batched_data, top_activated_indices=top_entire_activated_indices
+        )
         self.args.debug_logger.writer.add_histogram(
             "X/4. After gathering, x.mean(1) of [#actvated nodes for all the time stamps, embed_dim]",
             x.mean(1),
