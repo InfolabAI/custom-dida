@@ -35,19 +35,15 @@ class ScatterAndGather(nn.Module):
         )
         self.step = 0
 
-    def _to_entire(
-        self, x, batched_data, entire_node_feature=None, use_bd=True, indices=None
-    ):
+    def _to_entire(self, x, batched_data, entire_node_feature=None, use_bd=True):
         offset = 0
         t_entire_embeddings = []
         comm_ta = 0
         comm_bd = 0
         comm_en = 0
-        comm_activated_nodes = []
         for t, (node_num, activated_indices) in enumerate(
             zip(batched_data["node_num"], batched_data["indices_subnodes"])
         ):
-            comm_activated_nodes.append(activated_indices)
             # t_activated_embedding.size == [#nodes at t, embed_dim]
             t_activated_embedding = scatter(
                 # [#activated nodes at t, embed_dim]
@@ -59,12 +55,8 @@ class ScatterAndGather(nn.Module):
             )
             offset += node_num
 
-            if indices is not None:
-                ta = t_activated_embedding[indices]
-                bd = batched_data["x"][indices]
-            else:
-                ta = t_activated_embedding
-                bd = batched_data["x"]
+            ta = t_activated_embedding
+            bd = batched_data["x"]
             comm_ta += ta.abs().mean()
             comm_bd += bd.abs().mean()
             if entire_node_feature is not None:
@@ -89,30 +81,10 @@ class ScatterAndGather(nn.Module):
         #     print(
         #         f"comm_ta/comm_bd: {comm_ta/(comm_bd + 1e-8)}, comm_en/comm_bd: {comm_en/(comm_bd + 1e-8)}"
         #     )
-        return (
-            torch.stack(t_entire_embeddings, dim=0),
-            # 각 time 마다 activated 된 node 의 indices 를 모으면 중복된 node 가 있을 수 있으므로 unique
-            torch.concat(comm_activated_nodes, dim=0).unique(),
-        )
+        return torch.stack(t_entire_embeddings, dim=0)
 
-    def _from_entire(self, x, batched_data, top_activated_indices=None):
+    def _from_entire(self, x, batched_data):
         node_features = []
         for nodes, activated_indices in zip(x, batched_data["indices_subnodes"]):
-            if top_activated_indices is not None:
-                # nodes 가 top activated nodes 라서 activated_indices 를 모두 포함하고 있지 않을 때
-                ti = top_activated_indices.cpu().numpy()
-                ai = activated_indices.cpu().numpy()
-                intersection = np.intersect1d(ti, ai)
-                # # nodes 에서의 intersection 위치
-                ti_indices = np.where(np.isin(ti, intersection))[0]
-                ai_indices = np.where(np.isin(ai, intersection))[0]
-                ti_nodes = nodes
-                ai_nodes = torch.zeros(
-                    [len(activated_indices), self.comp_dim], device=x.device
-                )
-                ai_nodes[ai_indices, :] = ti_nodes[ti_indices, :]
-                node_features.append(ai_nodes)
-            else:
-                # nodes 가 entire nodes 라서 activated_indices 를 모두 포함하고 있을 때
-                node_features.append(nodes[activated_indices.long()])
+            node_features.append(nodes[activated_indices.long()])
         return self.mlp_u(self.layer_norm_u(torch.concat(node_features, dim=0)))
