@@ -155,66 +155,9 @@ class ConvertGraphTypes:
         tr_input["node_data"] = torch.concat(tr_input["node_data"])
         tr_input["edge_data"] = torch.concat(tr_input["edge_data"])
         tr_input["edge_index"] = torch.concat(tr_input["edge_index"], dim=1)
+        tr_input["x"] = list_of_dgl_graphs[0].ndata["w"]
 
         return tr_input
-
-    # TODO 삭제 필요
-    def dglG_to_TrInputDict(self, dglG, minnum_nodes):
-        """
-        Parameters
-        --------
-        dglG: dgl.graph
-        minnum_nodes: int: deactivated nodes 로 community 를 만들 때 최소한의 node 수
-        """
-        st = time()
-
-        subgraph_list = []
-        node_data_index = 0
-        mapping_from_orig_to_subgraphs = {}
-        # 모든 activated nodes 를 하나의 community 로 간주하고, 나머지는 적절한 크기의 community 로 배분
-        comm_group = self._get_simple_communities(
-            torch.concat(dglG.edges()).unique().tolist(), dglG.num_nodes(), minnum_nodes
-        )
-
-        st = time()
-        a_graph_at_t = defaultdict(list)
-        # extract subgraphs with edge
-        for partition_id, indices_subnodes in comm_group.items():
-            subgraph = dgl.node_subgraph(dglG, indices_subnodes)
-            a_graph_at_t["indices_subnodes"].append(
-                torch.Tensor(indices_subnodes).int()
-            )
-            subgraph_list.append(subgraph)
-            for i in indices_subnodes:
-                mapping_from_orig_to_subgraphs[i] = [node_data_index]
-                node_data_index += 1
-        # logger.info(">" * 10, "time for extracting subgraphs with edge:", time() - st)
-
-        st = time()
-        for subgraph in subgraph_list:
-            a_graph_at_t["node_data"].append(subgraph.ndata["w"])
-            a_graph_at_t["edge_data"].append(subgraph.edata["w"])
-            edge_tensor = torch.concat(
-                [subgraph.edges()[0].unsqueeze(0), subgraph.edges()[1].unsqueeze(0)]
-            )
-            a_graph_at_t["edge_index"].append(edge_tensor)
-            a_graph_at_t["node_num"].append(subgraph.num_nodes())
-            a_graph_at_t["edge_num"].append(subgraph.num_edges())
-        # logger.info(">" * 10, "time for making a_graph_at_t:", time() - st)
-
-        st = time()
-        a_graph_at_t["node_data"] = torch.concat(a_graph_at_t["node_data"])
-        a_graph_at_t["edge_data"] = torch.concat(a_graph_at_t["edge_data"])
-        # BitCoinAlpha 는 하나의 t 에 edge 가 8개 밖에 없는 경우도 있어서, 사전에 정한 comm_group 중 일부는 edge 가 1개도 없는 subgraph 를 생성할수도 있음(즉, 모든 edge 가 neglect 됨)
-        a_graph_at_t["edge_index"] = torch.concat(a_graph_at_t["edge_index"], dim=1)
-        # logger.info(">" * 10, "concat time:", time() - st)
-        a_graph_at_t["mapping_from_orig_to_subgraphs"] = mapping_from_orig_to_subgraphs
-
-        logger.debug(
-            f"original #edges: {dglG.num_edges()} -> #edges: {a_graph_at_t['edge_index'].shape[1]}"
-        )
-
-        return a_graph_at_t
 
     def weighted_adjacency_to_graph(self, adj, node_features, edge_number_limitation):
         """

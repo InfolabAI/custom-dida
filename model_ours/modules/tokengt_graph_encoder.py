@@ -86,17 +86,23 @@ class TokenGTGraphEncoder(nn.Module):
         self.performer = performer
         self.performer_finetune = performer_finetune
 
-        self.custom = CustomMultiheadAttention(
-            args,
-            embedding_dim,
-            num_attention_heads,
-            attention_dropout,
-            q_noise=q_noise,
-            qn_block_size=qn_block_size,
-            activation_fn=activation_fn,
-            activation_dropout=activation_dropout,
-            dropout=dropout,
+        self.custom = nn.ModuleList(
+            [
+                CustomMultiheadAttention(
+                    args,
+                    embedding_dim,
+                    num_attention_heads,
+                    attention_dropout,
+                    q_noise=q_noise,
+                    qn_block_size=qn_block_size,
+                    activation_fn=activation_fn,
+                    activation_dropout=activation_dropout,
+                    dropout=dropout,
+                )
+                for layer_idx in range(num_encoder_layers)
+            ]
         )
+
         self.graph_feature = GraphFeatureTokenizer(
             args=args,
             hidden_dim=embedding_dim,
@@ -311,6 +317,7 @@ class TokenGTGraphEncoder(nn.Module):
 
         st = time.time()
         attn_dict = {"maps": {}, "padded_index": padded_index}
+        entire_node_feature = None
         for i in range(len(self.layers)):
             layer = self.layers[i]
             x, attn = layer(
@@ -321,8 +328,8 @@ class TokenGTGraphEncoder(nn.Module):
             )
 
             if self.args.propagate == "inneraug":
-                x = self.propagate_info(
-                    x, padded_node_mask, padded_edge_mask, batched_data
+                x, entire_node_feature = self.propagate_info(
+                    x, padded_node_mask, batched_data, entire_node_feature, i
                 )
             else:
                 pass
@@ -335,14 +342,12 @@ class TokenGTGraphEncoder(nn.Module):
         # x: T x B x C -> B x T x C -> (node_num) x C
         node_data = x.transpose(0, 1)[padded_node_mask, :]
         # logger.debug(f"ET [pure forward]: {time.time() - st:.5f}")
-        return node_data
+        return node_data, entire_node_feature
 
-    def propagate_info(self, x, padded_node_mask, padded_edge_mask, batched_data):
+    def propagate_info(self, x, padded_node_mask, batched_data, entire_node_feature, i):
         # x: [#tokens, #timestamps, embed dim] -> [#timestamps, #tokens, embed dim]
         x = x.transpose(0, 1)
-        edges = x[padded_edge_mask, :]
-        x[padded_edge_mask, :] = 0
-        x = self.custom(x)
-        # x[padded_node_mask, :] = out
-        x[padded_edge_mask, :] = edges
-        return x.transpose(0, 1)
+        x, entire_node_feature = self.custom[i](
+            x, batched_data, padded_node_mask, entire_node_feature
+        )
+        return x.transpose(0, 1), entire_node_feature

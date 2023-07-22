@@ -111,8 +111,8 @@ class MultiheadAttention(nn.Module):
     def custom_attention(self, attn_probs, tgt_len, bsz, embed_dim):
         # lower triangular matrix [T, T]
         mask = torch.tril(torch.ones_like(attn_probs.mean(0)).to(attn_probs.device))
-        # t 자신의 10번째 전까지만 attention
-        len_ = 10
+        # t 자신의 5번째 전까지만 attention
+        len_ = 5
         for i, row in enumerate(mask):
             if i > len_:
                 row[: i - len_] = 0

@@ -140,3 +140,5 @@ class Runner(object):
                 self.writer.add_scalar("Train AUC", test_results[1], epoch)
                 self.writer.add_scalar("Val AUC", test_results[2], epoch)
                 self.writer.add_scalar("Test AUC", test_results[3], epoch)
+
+                self.args.total_step += 1

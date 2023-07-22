@@ -2,12 +2,13 @@ import torch
 import torch.nn as nn
 import math
 import dgl
+
 from torch_scatter import scatter
 from loguru import logger
 from time import time
 from tqdm import tqdm
 from convert_graph_types import ConvertGraphTypes
-from model_ours.modules.droppath import DropPath
+from model_ours.modules.scatter_and_gather import ScatterAndGather
 from model_ours.modules.model_tokengt import TokenGTModel
 from model_ours.modules.multihead_attention import MultiheadAttention
 from model_ours.trainer_ours import TrainerOurs
@@ -186,14 +187,7 @@ class OurModel(nn.Module):
         self.args = args
         self.attention = Attention(args, num_nodes)
         self.cs_decoder = MultiplyPredictor()
-        self.layer_norm = nn.LayerNorm(args.encoder_embed_dim)
-        self.mlp = nn.Sequential(
-            nn.Linear(args.encoder_embed_dim, 2 * args.encoder_embed_dim),
-            nn.GELU(),
-            nn.Dropout1d(0.5),
-            # DropPath(0.99, dim=0),
-            nn.Linear(2 * args.encoder_embed_dim, args.encoder_embed_dim),
-        )
+        self.scatter_and_gather = ScatterAndGather(args, args.encoder_embed_dim)
 
         self.trainer = TrainerOurs(args, self, data_to_prepare)
         self.tester = TesterOurs(args, self, data_to_prepare)
@@ -249,28 +243,9 @@ class OurModel(nn.Module):
 
         tr_input = self._get_tr_input(list_of_dgl_graphs)
         # [sum(activated_nodes) of all the timestamps, embed_dim]
-        embeddings = self.main_model(tr_input, get_embedding=True)
+        embeddings, entire_node_feature = self.main_model(tr_input, get_embedding=True)
 
-        offset = 0
-        t_entire_embeddings = []
-        for node_num, activated_indices in zip(
-            tr_input["node_num"], tr_input["indices_subnodes"]
-        ):
-            # t_activated_embedding.size == [#nodes at t, embed_dim]
-            t_activated_embedding = scatter(
-                # [#activated nodes at t, embed_dim]
-                embeddings[offset : offset + node_num],
-                activated_indices.long().to(self.args.device),
-                dim=0,
-                dim_size=self.args.num_nodes,
-                reduce="add",
-            )
-            offset += node_num
-
-            # node_features are the same across all the timestamps, so, we use [0]
-            t_node_feature = list_of_dgl_graphs[0].ndata["w"]
-            t_embedding = self.mlp(
-                self.layer_norm(t_activated_embedding + t_node_feature)
-            )
-            t_entire_embeddings.append(t_embedding)
+        t_entire_embeddings = self.scatter_and_gather._to_entire(
+            embeddings, tr_input, entire_node_feature
+        )
         return t_entire_embeddings

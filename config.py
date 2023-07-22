@@ -8,6 +8,7 @@ logger.critical(
 )
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--log_dir", type=str, default="logs/performance/")
 # Transformer
 parser.add_argument("--encoder_embed_dim", type=int, default=32)
 parser.add_argument("--encoder_ffn_embed_dim", type=int, default=32)
@@ -79,7 +80,6 @@ parser.add_argument(
     "--sampling_times", type=int, default=1, help="negative sampling times"
 )
 parser.add_argument("--min_epoch", type=int, default=200, help="min epoch")
-parser.add_argument("--log_dir", type=str, default="logs/tmp/")
 parser.add_argument("--ex_name", type=str, default="test")
 parser.add_argument("--nhid", type=int, default=8, help="dim of hidden embedding")  # 8
 parser.add_argument("--n_layers", type=int, default=2)
