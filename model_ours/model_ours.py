@@ -7,6 +7,7 @@ from loguru import logger
 from time import time
 from tqdm import tqdm
 from convert_graph_types import ConvertGraphTypes
+from model_ours.modules.droppath import DropPath
 from model_ours.modules.model_tokengt import TokenGTModel
 from model_ours.modules.multihead_attention import MultiheadAttention
 from model_ours.trainer_ours import TrainerOurs
@@ -189,6 +190,8 @@ class OurModel(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(args.encoder_embed_dim, 2 * args.encoder_embed_dim),
             nn.GELU(),
+            nn.Dropout1d(0.5),
+            # DropPath(0.99, dim=0),
             nn.Linear(2 * args.encoder_embed_dim, args.encoder_embed_dim),
         )
 

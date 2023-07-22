@@ -188,12 +188,14 @@ class TokenGTGraphEncoderLayer(nn.Module):
             )
             x = self.dropout_module(x)
             x = self.drop_path1(x)
+            # x = self.drop_path1(x, dim=0)
             x = residual + x
 
             residual = x
             x = self.final_layer_norm(x)
             x = self.feedforward(x)
             x = self.drop_path2(x)
+            # x = self.drop_path2(x, dim=0)
             x = residual + x
 
         elif self.layernorm_style == "postnorm":

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import math
 from torch_scatter import scatter
+from .droppath import DropPath
 from .feedforward import FeedForward
 from loguru import logger
 from model_ours.modules.multihead_attention import MultiheadAttention
@@ -28,7 +29,7 @@ class CustomMultiheadAttention(MultiheadAttention):
         )
         self.args = args
         self.load_positional_encoding(args.encoder_embed_dim, 1000, args.device)
-        self.drop_path = DropPath(0.9)
+        self.drop_path = DropPath(0.1, dim=0)
         self.layer_norm_in = nn.LayerNorm(embed_dim)
         self.layer_norm_out = nn.LayerNorm(embed_dim)
 
@@ -37,7 +38,6 @@ class CustomMultiheadAttention(MultiheadAttention):
         residual = x
         x = self.layer_norm_in(x)
         # x == [#timestamps, #tokens, embed_dim] -> [#timestamps, 1, embed_dim]
-        residual = x
         x = torch.nn.functional.adaptive_avg_pool1d(
             x.transpose(1, 2), 1
         ) + torch.nn.functional.adaptive_max_pool1d(x.transpose(1, 2), 1)
@@ -108,33 +108,3 @@ class CustomMultiheadAttention(MultiheadAttention):
         for entier_nodes, activated_indices in zip(x, batched_data["indices_subnodes"]):
             node_features.append(entier_nodes[activated_indices.long()])
         return torch.concat(node_features, dim=0)
-
-
-class DropPath(nn.Module):
-    def __init__(self, p: float = 0.5, inplace: bool = False):
-        """https://github.com/FrancescoSaverioZuppichini/DropPath/blob/main/README.ipynb"""
-        super().__init__()
-        self.p = p
-        self.inplace = inplace
-
-    def forward(self, x):
-        if self.training and self.p > 0:
-            x = self._drop_path(x, self.p, self.inplace)
-        return x
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(p={self.p})"
-
-    def _drop_path(self, x, keep_prob: float = 1.0, inplace: bool = False):
-        """
-        첫 번째 dimension 에 대해 random 하게 dropout 수행
-        """
-        mask_shape = (x.shape[0],) + (1,) * (x.ndim - 1)
-        # remember tuples have the * operator -> (1,) * 3 = (1,1,1)
-        mask = x.new_empty(mask_shape).bernoulli_(keep_prob)
-        mask.div_(keep_prob)
-        if inplace:
-            x.mul_(mask)
-        else:
-            x = x * mask
-        return x

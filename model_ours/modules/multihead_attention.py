@@ -117,7 +117,7 @@ class MultiheadAttention(nn.Module):
             if i > len_:
                 row[: i - len_] = 0
 
-        # 대각선은 1(t 자신의 adj 에 대해서는 attention 보장)
+        # 대각선은 1/T 를 더함(t 자신의 node feature 에 대해서는 attention 보장)
         attn_probs += (
             torch.eye(attn_probs.shape[1], device=attn_probs.device).unsqueeze(0)
             / attn_probs.shape[1]
