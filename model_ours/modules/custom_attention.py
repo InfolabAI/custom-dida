@@ -33,19 +33,23 @@ class CustomMultiheadAttention(MultiheadAttention):
         self.layer_norm_out = nn.LayerNorm(embed_dim)
 
     def forward(self, x):
-        # x = self._to_entier(x, batched_data)
+        # x == [#timestamps, #tokens (edge features are removed), embed_dim]
         residual = x
         x = self.layer_norm_in(x)
+        # x == [#timestamps, #tokens, embed_dim] -> [#timestamps, 1, embed_dim]
+        residual = x
         x = torch.nn.functional.adaptive_avg_pool1d(
             x.transpose(1, 2), 1
         ) + torch.nn.functional.adaptive_max_pool1d(x.transpose(1, 2), 1)
         x = x.transpose(1, 2)
         # positional encoding. self.pe.shape == [max_position, embed_dim] -> [max_position, 1, embed_dim]
         x = x + self.pe[: x.shape[0]].unsqueeze(1)
+        # attention map is [#timestamps, #timestamps]
         x, attn = super().forward(x, x, x, attn_bias=None, customize=True)
+        # [#timestamps, 1, embed_dim] -> [#timestamps(some elementes are dropped), 1, embed_dim]
         x = self.drop_path(x)
+        # [#timestamps, 1, embed_dim] -> [#timestamps, #tokens, embed_dim]
         x = x + residual
-        # return self._from_entier(x, batched_data)
         return x
 
     def load_positional_encoding(self, dim_feature=1, max_position=1000, device="cpu"):
