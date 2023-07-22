@@ -108,6 +108,23 @@ class MultiheadAttention(nn.Module):
         if self.out_proj.bias is not None:
             nn.init.constant_(self.out_proj.bias, 0.0)
 
+    def custom_attention(self, attn_probs, tgt_len, bsz, embed_dim):
+        # lower triangular matrix [T, T]
+        mask = torch.tril(torch.ones_like(attn_probs.mean(0)).to(attn_probs.device))
+        # t 자신의 10번째 전까지만 attention
+        len_ = 10
+        for i, row in enumerate(mask):
+            if i > len_:
+                row[: i - len_] = 0
+
+        # 대각선은 1(t 자신의 adj 에 대해서는 attention 보장)
+        attn_probs += (
+            torch.eye(attn_probs.shape[1], device=attn_probs.device).unsqueeze(0)
+            / attn_probs.shape[1]
+        )
+        attn_probs = attn_probs * mask.unsqueeze(0)
+        return attn_probs
+
     def forward(
         self,
         query,
@@ -120,6 +137,7 @@ class MultiheadAttention(nn.Module):
         before_softmax: bool = False,
         need_head_weights: bool = False,
         ret_attn_probs: bool = False,
+        customize: bool = False,
     ) -> Tuple[Tensor, Optional[Tensor]]:
         """Input shape: Time x Batch x Channel
 
@@ -212,6 +230,8 @@ class MultiheadAttention(nn.Module):
         # logger.debug(f"After softmax, attn_probs.shape: {attn_probs.shape}")
         if ret_attn_probs:
             return attn_probs
+        if customize:
+            attn_probs = self.custom_attention(attn_probs, tgt_len, bsz, embed_dim)
 
         attn = torch.bmm(attn_probs, v)
         # logger.debug(f"After bmm(attn_probs, v), attn.shape: {attn.shape}")

@@ -15,6 +15,7 @@ from .multihead_attention import MultiheadAttention
 from .tokenizer import GraphFeatureTokenizer
 from .tokengt_graph_encoder_layer import TokenGTGraphEncoderLayer
 from loguru import logger
+from .custom_attention import CustomMultiheadAttention
 
 
 def init_graphormer_params(module):
@@ -74,6 +75,7 @@ class TokenGTGraphEncoder(nn.Module):
         return_attention: bool = False,
     ) -> None:
         super().__init__()
+        self.args = args
         self.dropout_module = FairseqDropout(
             dropout, module_name=self.__class__.__name__
         )
@@ -84,6 +86,17 @@ class TokenGTGraphEncoder(nn.Module):
         self.performer = performer
         self.performer_finetune = performer_finetune
 
+        self.custom = CustomMultiheadAttention(
+            args,
+            embedding_dim,
+            num_attention_heads,
+            attention_dropout,
+            q_noise=q_noise,
+            qn_block_size=qn_block_size,
+            activation_fn=activation_fn,
+            activation_dropout=activation_dropout,
+            dropout=dropout,
+        )
         self.graph_feature = GraphFeatureTokenizer(
             args=args,
             hidden_dim=embedding_dim,
@@ -307,6 +320,13 @@ class TokenGTGraphEncoder(nn.Module):
                 self_attn_bias=None,
             )
 
+            if self.args.propagate == "inneraug":
+                x = self.propagate_info(
+                    x, padded_node_mask, padded_edge_mask, batched_data
+                )
+            else:
+                pass
+
             if not last_state_only:
                 inner_states.append(x)
             attn_dict["maps"][i] = attn
@@ -316,3 +336,13 @@ class TokenGTGraphEncoder(nn.Module):
         node_data = x.transpose(0, 1)[padded_node_mask, :]
         # logger.debug(f"ET [pure forward]: {time.time() - st:.5f}")
         return node_data
+
+    def propagate_info(self, x, padded_node_mask, padded_edge_mask, batched_data):
+        # x: [#tokens, #timestamps, embed dim] -> [#timestamps, #tokens, embed dim]
+        x = x.transpose(0, 1)
+        edges = x[padded_edge_mask, :]
+        x[padded_edge_mask, :] = 0
+        x = self.custom(x)
+        # x[padded_node_mask, :] = out
+        x[padded_edge_mask, :] = edges
+        return x.transpose(0, 1)

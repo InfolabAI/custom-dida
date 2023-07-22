@@ -45,7 +45,7 @@ parser.add_argument(
     "--propagate",
     type=str,
     default="dyaug",
-    help="dyaug | no",
+    help="inneraug | dyaug | no",
 )
 parser.add_argument(
     "--alpha_std",
