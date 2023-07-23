@@ -131,14 +131,17 @@ class Runner(object):
                         "Loss": epoch_losses,
                         "Time": time.time() - t0,
                         "Train AUC": test_results[1],
-                        "Val AUC": test_results[2],
-                        "Test AUC": test_results[3],
+                        "Val AUC": test_results[3],
+                        "Test AUC": test_results[5],
                         "lr": self.optimizer[0].param_groups[0]["lr"],
                     }
                 )
 
-                self.writer.add_scalar("Train AUC", test_results[1], epoch)
-                self.writer.add_scalar("Val AUC", test_results[2], epoch)
-                self.writer.add_scalar("Test AUC", test_results[3], epoch)
+                self.writer.add_scalar("AUC/Train AUC mean", test_results[1], epoch)
+                self.writer.add_scalar("AUC/Train AUC std", test_results[2], epoch)
+                self.writer.add_scalar("AUC/Val AUC mean", test_results[3], epoch)
+                self.writer.add_scalar("AUC/Val AUC std", test_results[4], epoch)
+                self.writer.add_scalar("AUC/Test AUC mean", test_results[5], epoch)
+                self.writer.add_scalar("AUC/Test AUC std", test_results[6], epoch)
 
                 self.args.total_step += 1

@@ -38,6 +38,9 @@ class Tester_DIDA(TrainerAndTester):
         return [
             epoch,
             np.mean(train_auc_list),
+            np.std(train_auc_list),
             np.mean(val_auc_list),
+            np.std(val_auc_list),
             np.mean(test_auc_list),
+            np.std(test_auc_list),
         ]

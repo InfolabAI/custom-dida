@@ -24,12 +24,10 @@ class TrainerOurs(TrainerAndTester):
         optimizer = self.runnerProperty.optimizer
         scheduler = self.runnerProperty.scheduler
 
-        embeddings = self.model(
+        embeddings, tr_input = self.model(
             data[: self.runnerProperty.len_train - 1], epoch=epoch, is_train=True
         )
 
-        edge_index = []
-        edge_label = []
         loss_list = []
         criterion = torch.nn.BCELoss()
         train_len = self.runnerProperty.len_train - 1
@@ -52,23 +50,16 @@ class TrainerOurs(TrainerAndTester):
             neg_y = z.new_zeros(neg_edge_index.size(1)).to(z.device)
             edge_label = torch.cat([pos_y, neg_y], dim=0)
 
-            def cal_loss(y, label):
-                return criterion(y, label)
-
             cy = self.model.cs_decoder(z, edge_index)
-            loss = cal_loss(cy, edge_label)
+            loss = criterion(cy, edge_label)
             loss_list.append(loss.unsqueeze(0))
 
         loss_concat = torch.concat(loss_list, dim=0)
         loss_mean = loss_concat.mean()
-        # penalty = torch.nn.functional.mse_loss( loss_concat, torch.zeros_like(loss_concat.detach()))
-        penalty = torch.nn.functional.kl_div(
-            torch.nn.functional.log_softmax(loss_concat, dim=0),
-            torch.ones_like(loss_concat.detach()) / len(loss_concat),
-            reduction="batchmean",
-        ) * len(loss_concat)
-        loss_total = loss_mean + penalty
-        logger.info(f"loss_mean: {loss_mean:.3f}, penalty: {penalty:.3f}")
+        loss_total = loss_mean
+        logger.info(
+            f"loss_mean: {loss_mean:.3f}, loss_variation: {torch.nn.functional.mse_loss(loss_concat.detach(), loss_mean.detach().expand_as(loss_concat.detach())):.5f}"
+        )
 
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()

@@ -62,3 +62,14 @@ class EnvLoss(nn.Module):
         pred = torch.cat([pos_pred, neg_pred], dim=0)
         y, pred = y.detach().cpu().numpy(), pred.detach().cpu().numpy()
         return roc_auc_score(y, pred), 0
+
+    def mse_from_pred_to_edge(self, z, edge_index, decoder, pos_neg):
+        if pos_neg == "pos":
+            y = z.new_ones(edge_index.size(1)).to(device)
+        elif pos_neg == "neg":
+            y = z.new_zeros(edge_index.size(1)).to(device)
+        else:
+            raise Exception("pos_neg should be pos or neg")
+        pred = decoder(z, edge_index)
+        y, pred = y.detach().cpu().float(), pred.detach().cpu().float()
+        return torch.nn.functional.mse_loss(y, pred)

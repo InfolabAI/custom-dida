@@ -248,4 +248,4 @@ class OurModel(nn.Module):
         t_entire_embeddings = self.scatter_and_gather._to_entire(
             embeddings, tr_input, entire_node_feature
         )
-        return t_entire_embeddings
+        return t_entire_embeddings, tr_input
