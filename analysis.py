@@ -14,7 +14,9 @@ class Analysis:
         self.pos_edge.append(pos_edge)
         self.neg_edge.append(neg_edge)
 
-    def analysis_activated_node_indices(self, embeddings, tr_input):
+    def analysis_activated_node_indices(
+        self, embeddings, tr_input, use_comm_act_ids=True
+    ):
         s_and_t_act_pe_list = []
         s_or_t_act_pe_list = []
         deact_pe_list = []
@@ -22,13 +24,24 @@ class Analysis:
         s_or_t_act_ne_list = []
         deact_ne_list = []
 
+        comm_act_ids = None
         for z, pe, ne, act_ids in zip(
             embeddings, self.pos_edge, self.neg_edge, tr_input["indices_subnodes"]
         ):
-            act_s_ids_pe = torch.isin(pe[0], act_ids.to(pe[0]))
-            act_t_ids_pe = torch.isin(pe[1], act_ids.to(pe[0]))
-            act_s_ids_ne = torch.isin(ne[0], act_ids.to(pe[0]))
-            act_t_ids_ne = torch.isin(ne[1], act_ids.to(pe[0]))
+            if comm_act_ids is None:
+                comm_act_ids = act_ids
+            else:
+                comm_act_ids = torch.cat([comm_act_ids, act_ids], dim=0).unique()
+
+            if use_comm_act_ids:
+                target_ids = comm_act_ids
+            else:
+                target_ids = act_ids
+
+            act_s_ids_pe = torch.isin(pe[0], target_ids.to(pe[0]))
+            act_t_ids_pe = torch.isin(pe[1], target_ids.to(pe[0]))
+            act_s_ids_ne = torch.isin(ne[0], target_ids.to(pe[0]))
+            act_t_ids_ne = torch.isin(ne[1], target_ids.to(pe[0]))
             s_and_t_act_pe = pe[:, act_s_ids_pe & act_t_ids_pe]
             s_or_t_act_pe = pe[:, act_s_ids_pe | act_t_ids_pe]
             deact_pe = pe[:, ~(act_s_ids_pe | act_t_ids_pe)]
