@@ -23,25 +23,20 @@ class CustomMultiheadAttention(MultiheadAttention):
         activation_dropout,
         dropout,
     ):
-        comp_dim = 2
         super().__init__(
-            comp_dim,
-            ceil(comp_dim / 2),
+            embed_dim,
+            ceil(embed_dim / 2),
             attention_dropout=attention_dropout,
             self_attention=True,
         )
         self.args = args
-        self.drop_path0d = DropPath(0.1, dim=0)
-        self.drop_path1d = DropPath(0.9, dim=1)
-        self.load_positional_encoding(comp_dim, 1000, args.device)
-        self.scatter_and_gather = ScatterAndGather(args, embed_dim, comp_dim)
+        self.drop_path = DropPath(0.1, dim=0)
+        self.layer_norm_in = nn.LayerNorm(embed_dim)
+        self.load_positional_encoding(embed_dim, 1000, args.device)
         self.step = 0
 
-    def forward(self, x, batched_data, padded_node_mask, entire_node_feature):
-        # if self.step > 20:
-        #    breakpoint()
-
-        # x == [#timestamps, #tokens (node + edge), embed_dim]
+    def forward(self, x):
+        # x == [#timestamps, #tokens (edge features are removed), embed_dim]
         residual = x
         self.args.debug_logger.writer.add_histogram(
             f"{self.training}-X/0. input.mean(2).mean(0) of [#timestamps, #tokens (node + edge), embed_dim]",
@@ -53,79 +48,47 @@ class CustomMultiheadAttention(MultiheadAttention):
             x.mean(2).mean(1),
             self.args.total_step,
         )
-        # [#timestamps, #tokens (node + edge), embed_dim] -> [#actvated nodes for all the time stamps, embed_dim]
-        x = x[padded_node_mask, :]
+        x = self.layer_norm_in(x)
+        # x == [#timestamps, #tokens, embed_dim] -> [#timestamps, 1, embed_dim]
+        residual = x
+        x = torch.nn.functional.adaptive_avg_pool1d(
+            x.transpose(1, 2), 1
+        ) + torch.nn.functional.adaptive_max_pool1d(x.transpose(1, 2), 1)
+        x = x.transpose(1, 2)
         self.args.debug_logger.writer.add_histogram(
-            f"{self.training}-X/1. After extracting nodes, x.mean(1) of [#actvated nodes for all the time stamps, embed_dim]",
-            x.mean(1),
-            self.args.total_step,
-        )
-        # [#actvated nodes for all the time stamps, embed_dim] -scatter to entire> [#timestamps, #entire nodes, comp_dim]
-        x = self.scatter_and_gather._to_entire(
-            x, batched_data, entire_node_feature, use_bd=False
-        )
-        # top 100 nodes 외에는 모두 0으로 masking 하여, attention 에서 제외
-        # x[:, x.mean(2).mean(0).sort(descending=True)[1][100:], :] = 0
-        self.drop_path1d(x)
-        self.args.debug_logger.writer.add_histogram(
-            f"{self.training}-X/2. After scattering, x.mean(2).mean(1) of [#timestamps, #entire nodes, comp_dim]",
+            f"{self.training}-X/1. After pooling, x.mean(2).mean(1) of [#timestamps, 1, comp_dim]",
             x.mean(2).mean(1),
             self.args.total_step,
         )
+        # positional encoding. self.pe.shape == [max_position, embed_dim] -> [max_position, 1, embed_dim]
+        x = x + self.pe[: x.shape[0]].unsqueeze(1)
         self.args.debug_logger.writer.add_histogram(
-            f"{self.training}-X/2. After scattering, x.mean(2).mean(0) of [#timestamps, #entire nodes, comp_dim]",
-            x.mean(2).mean(0),
+            f"{self.training}-X/2. After adding positional encoding, x.mean(2).mean(1) of [#timestamps, 1, comp_dim]",
+            x.mean(2).mean(1),
             self.args.total_step,
         )
-
-        # positional encoding. self.pe.shape == [max_position, comp_dim] -> [max_position, 1, comp_dim]
-        # x = x + self.pe[: x.shape[0]].unsqueeze(1)
-
         # attention map is [#timestamps, #timestamps]
         x, attn = super().forward(x, x, x, attn_bias=None, customize=True)
         self.args.debug_logger.writer.add_histogram(
-            f"{self.training}-X/3. After attention, x.mean(2).mean(1) of [#timestamps, #entire nodes, comp_dim]",
+            f"{self.training}-X/3. After attention, x.mean(2).mean(1) of [#timestamps, 1, comp_dim]",
             x.mean(2).mean(1),
             self.args.total_step,
         )
+        # [#timestamps, 1, embed_dim] -> [#timestamps(some elementes are dropped), 1, embed_dim]
+        x = self.drop_path(x)
+        # [#timestamps, 1, embed_dim] -> [#timestamps, #tokens, embed_dim]
+        x = x + residual
         self.args.debug_logger.writer.add_histogram(
-            f"{self.training}-X/3. After attention, x.mean(2).mean(0) of [#timestamps, #entire nodes, comp_dim]",
-            x.mean(2).mean(0),
-            self.args.total_step,
-        )
-        # [#timestamps, #entire nodes, comp_dim] -> [#timestamps(some elementes are dropped), #entire nodes, comp_dim]
-        x = self.drop_path0d(x)
-
-        # [#timestamps, #entire nodes, comp_dim] -gather from entire-> [#actvated nodes for all the time stamps, embed_dim] -indexing-> [#timestamps, #tokens (node + edge), embed_dim]
-        ga = self.scatter_and_gather._from_entire(x, batched_data)
-        self.args.debug_logger.writer.add_histogram(
-            f"{self.training}-X/4. After gathering, x.mean(1) of [#actvated nodes for all the time stamps, embed_dim]",
-            x.mean(1),
-            self.args.total_step,
-        )
-        # print(
-        #    f"ga/residual[padded_node_mask, :] {ga.abs().mean()/residual[padded_node_mask, :].abs().mean():.2f}"
-        # )
-        if self.training:
-            self.step += 1
-        residual[padded_node_mask, :] += ga * 10000
-        self.args.debug_logger.writer.add_histogram(
-            f"{self.training}-X/5. After intervening nodes to input, input.mean(2).mean(0) of [#timestamps, #tokens (node + edge), embed_dim]",
+            f"{self.training}-X/4. After intervening nodes to input, input.mean(2).mean(0) of [#timestamps, #tokens (node + edge), embed_dim]",
             residual.mean(2).mean(0),
             self.args.total_step,
         )
         self.args.debug_logger.writer.add_histogram(
-            f"{self.training}-X/5. After intervening nodes to input, input.mean(2).mean(1) of [#timestamps, #tokens (node + edge), embed_dim]",
+            f"{self.training}-X/4. After intervening nodes to input, input.mean(2).mean(1) of [#timestamps, #tokens (node + edge), embed_dim]",
             residual.mean(2).mean(1),
             self.args.total_step,
         )
-        # reduce x [#timestamps, #entire nodes, comp_dim] -> [#timestamps, #entire nodes, 1] for broadcasting
-        return (
-            residual,
-            None,
-            # (entire_node_feature if entire_node_feature is not None else 0)
-            # + torch.nn.functional.adaptive_avg_pool1d(x, 1).detach(),
-        )  # self.scatter_and_gather.reduce_mlp(x) + entire_node_feature
+        return x, None
 
     def load_positional_encoding(self, dim_feature=1, max_position=1000, device="cpu"):
         """

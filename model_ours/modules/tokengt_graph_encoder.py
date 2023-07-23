@@ -348,6 +348,6 @@ class TokenGTGraphEncoder(nn.Module):
         # x: [#tokens, #timestamps, embed dim] -> [#timestamps, #tokens, embed dim]
         x = x.transpose(0, 1)
         x, entire_node_feature = self.custom[i](
-            x, batched_data, padded_node_mask, entire_node_feature
+            x  # , batched_data, padded_node_mask, entire_node_feature
         )
         return x.transpose(0, 1), entire_node_feature

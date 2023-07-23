@@ -30,6 +30,8 @@ class TrainerOurs(TrainerAndTester):
 
         edge_index = []
         edge_label = []
+        loss_list = []
+        criterion = torch.nn.BCELoss()
         train_len = self.runnerProperty.len_train - 1
 
         for t in range(train_len):
@@ -45,31 +47,32 @@ class TrainerOurs(TrainerAndTester):
                     pos_edge_index,
                     num_neg_samples=pos_edge_index.size(1) * args.sampling_times,
                 )
-            edge_index.append(torch.cat([pos_edge_index, neg_edge_index], dim=-1))
+            edge_index = torch.cat([pos_edge_index, neg_edge_index], dim=-1)
             pos_y = z.new_ones(pos_edge_index.size(1)).to(z.device)
             neg_y = z.new_zeros(neg_edge_index.size(1)).to(z.device)
-            edge_label.append(torch.cat([pos_y, neg_y], dim=0))
+            edge_label = torch.cat([pos_y, neg_y], dim=0)
 
-        edge_label = torch.cat(edge_label, dim=0)
-        criterion = torch.nn.BCELoss()
+            def cal_loss(y, label):
+                return criterion(y, label)
 
-        def cal_loss(y, label):
-            return criterion(y, label)
+            cy = self.model.cs_decoder(z, edge_index)
+            loss = cal_loss(cy, edge_label)
+            loss_list.append(loss.unsqueeze(0))
 
-        def cal_y(embeddings, decoder):
-            preds = torch.tensor([]).to(embeddings[0].device)
-            for t in range(train_len):
-                z = embeddings[t]
-                pred = decoder(z, edge_index[t])
-                preds = torch.cat([preds, pred])
-            return preds
-
-        cy = cal_y(embeddings, self.model.cs_decoder)
-        loss = cal_loss(cy, edge_label)
+        loss_concat = torch.concat(loss_list, dim=0)
+        loss_mean = loss_concat.mean()
+        # penalty = torch.nn.functional.mse_loss( loss_concat, torch.zeros_like(loss_concat.detach()))
+        penalty = torch.nn.functional.kl_div(
+            torch.nn.functional.log_softmax(loss_concat, dim=0),
+            torch.ones_like(loss_concat.detach()) / len(loss_concat),
+            reduction="batchmean",
+        ) * len(loss_concat)
+        loss_total = loss_mean + penalty
+        logger.info(f"loss_mean: {loss_mean:.3f}, penalty: {penalty:.3f}")
 
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()
-        loss.backward()
+        loss_total.backward()
         # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
         scheduler[0].step()
         scheduler[1].step()
@@ -79,7 +82,9 @@ class TrainerOurs(TrainerAndTester):
                 logger.debug(f"{name} {param.std()}")
         # self.args.debug_logger.loguru( f"GPU usage", f"{get_gpu_memory_usage(self.args.device_id)} MiB", 1000,)
 
-        average_epoch_loss = loss.detach().item()
-        self.runnerProperty.writer.add_scalar("epoch_loss", loss.detach().cpu(), epoch)
+        average_epoch_loss = loss_total.detach().item()
+        self.runnerProperty.writer.add_scalar(
+            "epoch_loss", loss_total.detach().cpu(), epoch
+        )
 
         return average_epoch_loss, [], [], []
