@@ -41,9 +41,9 @@ class TesterOurs(TrainerAndTester):
                 else:
                     test_auc_list.append(auc)
 
-                self.analysis.accumulate(pos_edge, neg_edge)
+                # self.analysis.accumulate(pos_edge, neg_edge)
 
-            self.analysis.analysis_activated_node_indices(embeddings, tr_input)
+            # self.analysis.analysis_activated_node_indices(embeddings, tr_input)
 
             return [
                 epoch,

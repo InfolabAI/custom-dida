@@ -112,10 +112,10 @@ class MultiheadAttention(nn.Module):
         # lower triangular matrix [T, T]
         mask = torch.tril(torch.ones_like(attn_probs.mean(0)).to(attn_probs.device))
         # t 자신의 5번째 전까지만 attention
-        len_ = 5
-        for i, row in enumerate(mask):
-            if i > len_:
-                row[: i - len_] = 0
+        # len_ = 5
+        # for i, row in enumerate(mask):
+        #    if i > len_:
+        #        row[: i - len_] = 0
 
         # 대각선은 1/T 를 더함(t 자신의 node feature 에 대해서는 attention 보장)
         attn_probs += (

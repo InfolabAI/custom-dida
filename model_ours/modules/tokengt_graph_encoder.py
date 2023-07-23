@@ -329,7 +329,12 @@ class TokenGTGraphEncoder(nn.Module):
 
             if self.args.propagate == "inneraug":
                 x, entire_node_feature = self.propagate_info(
-                    x, padded_node_mask, batched_data, entire_node_feature, i
+                    x,
+                    padded_node_mask,
+                    padded_edge_mask,
+                    batched_data,
+                    entire_node_feature,
+                    i,
                 )
             else:
                 pass
@@ -344,10 +349,16 @@ class TokenGTGraphEncoder(nn.Module):
         # logger.debug(f"ET [pure forward]: {time.time() - st:.5f}")
         return node_data, entire_node_feature
 
-    def propagate_info(self, x, padded_node_mask, batched_data, entire_node_feature, i):
+    def propagate_info(
+        self,
+        x,
+        padded_node_mask,
+        padded_edge_mask,
+        batched_data,
+        entire_node_feature,
+        i,
+    ):
         # x: [#tokens, #timestamps, embed dim] -> [#timestamps, #tokens, embed dim]
         x = x.transpose(0, 1)
-        x, entire_node_feature = self.custom[i](
-            x  # , batched_data, padded_node_mask, entire_node_feature
-        )
+        x, entire_node_feature = self.custom[i](x, padded_node_mask, padded_edge_mask)
         return x.transpose(0, 1), entire_node_feature

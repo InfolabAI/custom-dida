@@ -29,10 +29,6 @@ class ScatterAndGather(nn.Module):
             nn.GELU(),
             nn.Linear(2 * comp_dim, embed_dim),
         )
-        self.reduce_mlp = nn.Sequential(
-            nn.Linear(comp_dim, 1),
-            nn.GELU(),
-        )
         self.step = 0
 
     def _to_entire(self, x, batched_data, entire_node_feature=None, use_bd=True):
