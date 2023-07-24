@@ -245,7 +245,5 @@ class OurModel(nn.Module):
         # [sum(activated_nodes) of all the timestamps, embed_dim]
         embeddings, entire_node_feature = self.main_model(tr_input, get_embedding=True)
 
-        t_entire_embeddings = self.scatter_and_gather._to_entire(
-            embeddings, tr_input, entire_node_feature
-        )
+        t_entire_embeddings = self.scatter_and_gather._to_entire(embeddings, tr_input)
         return t_entire_embeddings, tr_input

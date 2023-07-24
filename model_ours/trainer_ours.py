@@ -56,10 +56,10 @@ class TrainerOurs(TrainerAndTester):
 
         ortho_loss = 0
         for custom in self.model.main_model.encoder.graph_encoder.custom:
-            ortho_loss += custom.disentangler.ortho_loss * 0.5
+            ortho_loss += custom.disentangler.ortho_loss
         loss_concat = torch.concat(loss_list, dim=0)
         loss_mean = loss_concat.mean()
-        loss_total = loss_mean  # + ortho_loss
+        loss_total = loss_mean + ortho_loss
         logger.info(
             f"loss_mean: {loss_mean:.3f}, loss_variation: {torch.nn.functional.mse_loss(loss_concat.detach(), loss_mean.detach().expand_as(loss_concat.detach())):.5f}, othogonality_loss: {ortho_loss.detach():.7f}"
         )

@@ -21,22 +21,21 @@ class CustomMultiheadAttention(MultiheadAttention):
         activation_dropout,
         dropout,
     ):
-        # nodes 또는 edges 를 몇 개로 나눌 것인가
-        comp_len = 3
-        # 나누어진 각각의 node basket 또는 edge basket 에 대해 몇개 씩의 feature 를 추출할 것인가
-        comp_dim = 16
-        # *2 는 nodes 와 edges 를 각각 처리하기 때문
-        disentangle_dim = comp_dim * (comp_len * 2)
+        # nodes 를 몇 개로 나눌 것인가
+        comp_len = 30
+        # 나누어진 각각의 node basket 에 대해 몇개 씩의 feature 를 추출할 것인가
+        comp_dim = 4
+        disentangle_dim = comp_dim * comp_len
         super().__init__(
             disentangle_dim,
             # 각 head 는 하나의 comp_dim 에 대해 attention 을 수행함
-            ceil(disentangle_dim / (comp_len * 2)),
+            comp_len,
             attention_dropout=attention_dropout,
             self_attention=True,
         )
         self.disentangler = Disentangler(args, embed_dim, comp_len, comp_dim)
         self.to_embed_dim = nn.Sequential(
-            nn.Linear(comp_dim, comp_dim * 4),
+            nn.Linear(disentangle_dim, comp_dim * 4),
             nn.GELU(),
             nn.Dropout1d(0.1),
             nn.Linear(comp_dim * 4, embed_dim),
@@ -109,10 +108,12 @@ class CustomMultiheadAttention(MultiheadAttention):
         residual = (
             residual
             # 적절한 크기의 영향을 주기위해 여기에 linear 를 배치함 이게 없으면 residual 이 dominate 하여 거의 영향을 못 줌
-            + self.to_embed_dim(
-                self.disentangler.decode(x, padded_node_mask, padded_edge_mask)
-            )
-            # + self.to_embed_dim(x)
+            # + self.to_embed_dim(
+            #    self.disentangler.decode(
+            #        x, residual, padded_node_mask, padded_edge_mask
+            #    )
+            # )
+            + self.to_embed_dim(x)
         )
         self.log_output(residual)
         return residual, None
