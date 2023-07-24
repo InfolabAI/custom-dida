@@ -109,13 +109,18 @@ class MultiheadAttention(nn.Module):
             nn.init.constant_(self.out_proj.bias, 0.0)
 
     def custom_attention(self, attn_probs, tgt_len, bsz, embed_dim):
+        x_dim = attn_probs.shape[1]
         # lower triangular matrix [T, T]
-        mask = torch.tril(torch.ones_like(attn_probs.mean(0)).to(attn_probs.device))
-        # t 자신의 5번째 전까지만 attention
-        # len_ = 5
-        # for i, row in enumerate(mask):
-        #    if i > len_:
-        #        row[: i - len_] = 0
+        mask = torch.tril(torch.ones(x_dim, x_dim).to(attn_probs.device))
+        decay_factor = 0.95
+        # 대각선에서 한 칸 멀어질때마다 decay_factor 를 한 번 곱함
+        for i in range(1, x_dim):
+            decay_mat = (
+                torch.tril(torch.ones(x_dim - i, x_dim - i).to(attn_probs.device))
+                * decay_factor
+            )
+            decay_mat[decay_mat == 0] = 1.0
+            mask[i:, :-i] *= decay_mat
 
         # 대각선은 1/T 를 더함(t 자신의 node feature 에 대해서는 attention 보장)
         attn_probs += (
@@ -123,6 +128,8 @@ class MultiheadAttention(nn.Module):
             / attn_probs.shape[1]
         )
         attn_probs = attn_probs * mask.unsqueeze(0)
+        # 각 row 의 합이 1이 되도록 normalize, 각 row 의 합이 다르면 training 시점과 test 시점의 attention score 의 크긱가 다르게 된다. 각 row 는 t 시점에서의 attention distribution.
+        attn_probs = attn_probs * 1 / attn_probs.sum(2, keepdim=True)
         return attn_probs
 
     def forward(
