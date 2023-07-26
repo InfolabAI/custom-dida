@@ -27,9 +27,9 @@ class CustomMultiheadAttention(MultiheadAttention):
         comp_dim = 4
         disentangle_dim = comp_dim * comp_len
         super().__init__(
-            2000,
+            disentangle_dim,
             # 각 head 는 하나의 comp_dim 에 대해 attention 을 수행함
-            500,
+            comp_len,
             attention_dropout=attention_dropout,
             self_attention=True,
         )
