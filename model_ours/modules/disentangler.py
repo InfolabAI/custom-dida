@@ -46,7 +46,7 @@ class Disentangler(nn.Module):
         )
 
         entire_indices = np.arange(time_entirenodes_emdim.shape[1])
-        # shuffle 하면 test AUC 0.6 이 한계, shuffle 안하면 0.7 가능
+        # shuffle 하면 test AUC 0.6 이 한계, shuffle 안하면 0.7 가능.
         # if self.training:
         #    np.random.shuffle(entire_indices)
         self.indices_history = np.array_split(entire_indices, self.comp_len)
