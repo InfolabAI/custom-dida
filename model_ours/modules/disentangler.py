@@ -2,84 +2,84 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from .scatter_and_gather import ScatterAndGather
 
 
 class Disentangler(nn.Module):
-    def __init__(self, args, embed_dim):
+    def __init__(self, args, embed_dim, comp_len, comp_dim):
         super().__init__()
         self.args = args
         self.embed_dim = embed_dim
-        self.comp_len = 16
-        self.comp_dim = embed_dim // 2
-        self.node_comp_mlps = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Linear(embed_dim, self.comp_dim * 2),
-                    nn.GELU(),
-                    nn.Dropout1d(0.1),
-                    nn.Linear(self.comp_dim * 2, self.comp_dim),
-                )
-                for _ in range(self.comp_len)
-            ]
+        self.comp_len = comp_len
+        self.comp_dim = comp_dim
+        self.encode_layer_norm = nn.LayerNorm(embed_dim)
+        self.encode_final_layer_norm = nn.LayerNorm(comp_len * comp_dim)
+        self.decode_norm = nn.LayerNorm(comp_dim)
+        self.scga = ScatterAndGather(args, embed_dim)
+        self.node_comp_mlps = nn.Sequential(
+            nn.Linear(embed_dim, self.comp_dim * 2),
+            nn.GELU(),
+            nn.Dropout1d(0.1),
+            nn.Linear(self.comp_dim * 2, self.comp_dim),
         )
-        self.edge_comp_mlps = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Linear(embed_dim, self.comp_dim * 2),
-                    nn.GELU(),
-                    nn.Dropout1d(0.1),
-                    nn.Linear(self.comp_dim * 2, self.comp_dim),
-                )
-                for _ in range(self.comp_len)
-            ]
+        self.node_decomp_mlps = nn.Sequential(
+            nn.Linear(self.comp_dim, self.comp_dim * 2),
+            nn.GELU(),
+            nn.Dropout1d(0.1),
+            nn.Linear(self.comp_dim * 2, embed_dim),
         )
         self.ortho_loss = torch.zeros(1).squeeze(0).float().to(args.device)
 
-    def forward(self, x, padded_node_mask, padded_edge_mask):
+    def encode(self, x, padded_node_mask, padded_edge_mask, time_entirenodes_emdim):
         """
         Parameters
         ----------
         x: torch.Tensor
             [#timestamps, #tokens (node + edge), embed_dim]
         """
-        nodes = x[padded_node_mask, :]
-        edges = x[padded_edge_mask, :]
-
+        x = self.encode_layer_norm(x)
+        # [#timestamps, #tokens (activated nodes + edges), embed_dim] -> [#activated_nodes, embed_dim]
         compressed_x_list = []
+        nodes = x[padded_node_mask, :]
+        time_entirenodes_emdim = self.scga._to_entire(
+            nodes, self.args.batched_data, time_entirenodes_emdim, is_mlp=False
+        )
 
-        # node 또느 edge 를 compress 하기 전에
-        for mlp in self.node_comp_mlps:
-            # node 정보 처리
-            zeros_x = torch.zeros(
-                x.shape[0], x.shape[1], self.comp_dim, device=x.device
+        entire_indices = np.arange(time_entirenodes_emdim.shape[1])
+        # shuffle 하면 test AUC 0.6 이 한계, shuffle 안하면 0.7 가능
+        # if self.training:
+        #    np.random.shuffle(entire_indices)
+        self.indices_history = np.array_split(entire_indices, self.comp_len)
+        for i, indices in enumerate(self.indices_history):
+            compressed_x_list.append(
+                self.node_comp_mlps(time_entirenodes_emdim[:, indices, :]).sum(
+                    1, keepdim=True
+                )
             )
-            zeros_nodes = torch.zeros(nodes.shape[0], self.comp_dim, device=x.device)
-            rand_indices = np.random.choice(np.arange(nodes.shape[0]), size=1000)
-            zeros_nodes[rand_indices, :] = mlp(nodes[rand_indices, :])
-            zeros_x[padded_node_mask, :] = zeros_nodes
-            zeros_x = torch.nn.functional.adaptive_avg_pool1d(
-                zeros_x.transpose(1, 2), 1
-            ).transpose(1, 2)
-            compressed_x_list.append(zeros_x)
-
-        for mlp in self.edge_comp_mlps:
-            # edge 정보 처리
-            zeros_x = torch.zeros(
-                x.shape[0], x.shape[1], self.comp_dim, device=x.device
-            )
-            zeros_edges = torch.zeros(edges.shape[0], self.comp_dim, device=x.device)
-            rand_indices = np.random.choice(np.arange(edges.shape[0]), size=1000)
-            zeros_edges[rand_indices, :] = mlp(edges[rand_indices, :])
-            zeros_x[padded_edge_mask, :] = zeros_edges
-            zeros_x = torch.nn.functional.adaptive_avg_pool1d(
-                zeros_x.transpose(1, 2), 1
-            ).transpose(1, 2)
-            compressed_x_list.append(zeros_x)
-        compressed_x = torch.cat(compressed_x_list, dim=2)
-
+        compressed_x = self.encode_final_layer_norm(torch.cat(compressed_x_list, dim=2))
         self.ortho_loss = self.orthogonality_loss(*compressed_x_list)
 
         return compressed_x
+
+    def decode(self, x, padded_node_mask, padded_edge_mask):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            [#timestamps, #tokens (node + edge), embed_dim]
+        """
+        time_entirenodes_emdim = torch.zeros(
+            x.shape[0], self.args.num_nodes, self.comp_dim, device=x.device
+        )
+        for indices, tensor in zip(
+            self.indices_history, torch.split(x, self.comp_dim, dim=2)
+        ):
+            time_entirenodes_emdim[:, indices, :] += tensor
+        time_entirenodes_emdim = self.node_decomp_mlps(
+            self.decode_norm(time_entirenodes_emdim)
+        )
+
+        return time_entirenodes_emdim
 
     def orthogonality_loss(self, *tensors):
         """
@@ -95,6 +95,7 @@ class Disentangler(nn.Module):
             tensor.shape == tensors[0].shape for tensor in tensors
         ), "Input tensors must have the same shape."
 
+        tensors = [tensor.flatten() for tensor in tensors]
         # Normalize the tensors to have unit norm
         tensors_norm = [F.normalize(tensor, p=2, dim=-1) for tensor in tensors]
 
@@ -103,7 +104,8 @@ class Disentangler(nn.Module):
         for i in range(len(tensors_norm) - 1):
             for j in range(1, len(tensors_norm)):
                 dot_products.append(
-                    torch.sum(tensors_norm[i] * tensors_norm[j], dim=-1)
+                    torch.sum(tensors_norm[i] * tensors_norm[j])
+                    / torch.sum(tensors_norm[i] + tensors_norm[j])
                 )
 
         # The orthogonality loss is the mean squared error between the dot products and zero

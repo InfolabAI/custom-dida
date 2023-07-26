@@ -61,7 +61,11 @@ class EnvLoss(nn.Module):
         neg_pred = decoder(z, neg_edge_index)
         pred = torch.cat([pos_pred, neg_pred], dim=0)
         y, pred = y.detach().cpu().numpy(), pred.detach().cpu().numpy()
-        return roc_auc_score(y, pred), 0
+        try:
+            return roc_auc_score(y, pred), 0
+        except:
+            breakpoint()
+            print("pred NaN error")
 
     def mse_from_pred_to_edge(self, z, edge_index, decoder, pos_neg):
         if pos_neg == "pos":

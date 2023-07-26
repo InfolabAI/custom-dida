@@ -4,6 +4,10 @@ import json
 from runner import Runner
 from model_DIDA.model import DGNN
 from model_ours.model_ours import OurModel
+from model_DyFormer.model_dyformer import DyFormer
+from model_GNNs.GCN import GCN
+from model_GNNs.EvolveGCN import EvolveGCN
+from model_GNNs.GCRN import GCRN
 from loguru import logger
 from config import args
 from utils_main import *
@@ -32,6 +36,17 @@ if args.model == "ours":
     args = model.args
 elif args.model == "dida":
     model = DGNN(args, data_to_prepare).to(args.device)
+elif args.model == "dyformer":
+    logger.critical(
+        "DyFormer use own training code, own test code and own node features."
+    )
+    model = DyFormer(args, data_to_prepare)
+elif args.model == "gcn":
+    model = GCN(args, data_to_prepare)
+elif args.model == "gcrn":
+    model = GCRN(args, data_to_prepare)
+elif args.model == "evolvegcn":
+    model = EvolveGCN(args, data_to_prepare)
 else:
     raise Exception("Unknown model: {}".format(args.model))
 

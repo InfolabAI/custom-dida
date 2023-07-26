@@ -21,20 +21,24 @@ class CustomMultiheadAttention(MultiheadAttention):
         activation_dropout,
         dropout,
     ):
-        disentangle_dim = embed_dim * 16
+        # nodes 를 몇 개로 나눌 것인가
+        comp_len = 30
+        # 나누어진 각각의 node basket 에 대해 몇개 씩의 feature 를 추출할 것인가
+        comp_dim = 4
+        disentangle_dim = comp_dim * comp_len
         super().__init__(
             disentangle_dim,
-            ceil(disentangle_dim / (16 / 2)),
+            # 각 head 는 하나의 comp_dim 에 대해 attention 을 수행함
+            comp_len,
             attention_dropout=attention_dropout,
             self_attention=True,
         )
-        self.layer_norm_in = nn.LayerNorm(embed_dim)
-        self.disentangler = Disentangler(args, embed_dim)
+        self.disentangler = Disentangler(args, embed_dim, comp_len, comp_dim)
         self.to_embed_dim = nn.Sequential(
-            nn.Linear(disentangle_dim, embed_dim * 4),
+            nn.Linear(disentangle_dim, comp_dim * 4),
             nn.GELU(),
             nn.Dropout1d(0.1),
-            nn.Linear(embed_dim * 4, embed_dim),
+            nn.Linear(comp_dim * 4, embed_dim),
         )
 
         self.args = args
@@ -42,57 +46,68 @@ class CustomMultiheadAttention(MultiheadAttention):
         self.load_positional_encoding(disentangle_dim, 1000, args.device)
         self.step = 0
 
-    def forward(self, x, padded_node_mask, padded_edge_mask):
+    def log_input(self, x):
+        self.args.debug_logger.writer.add_histogram(
+            f"{self.training}-X/0. input.mean(2).mean(0) of [#timestamps, #tokens (node + edge), embed_dim]",
+            x.mean(2).mean(0),
+            self.args.total_step,
+        )
+        self.args.debug_logger.writer.add_histogram(
+            f"{self.training}-X/0. input.mean(2).mean(1) of [#timestamps, #tokens (node + edge), embed_dim]",
+            x.mean(2).mean(1),
+            self.args.total_step,
+        )
+
+    def log_encode(self, x):
+        self.args.debug_logger.writer.add_histogram(
+            f"{self.training}-X/1. After pooling, x.mean(2).mean(1) of [#timestamps, 1, comp_dim]",
+            x.mean(2).mean(1),
+            self.args.total_step,
+        )
+
+    def log_pe(self, x):
+        self.args.debug_logger.writer.add_histogram(
+            f"{self.training}-X/2. After adding positional encoding, x.mean(2).mean(1) of [#timestamps, 1, comp_dim]",
+            x.mean(2).mean(1),
+            self.args.total_step,
+        )
+
+    def log_att(self, x):
+        self.args.debug_logger.writer.add_histogram(
+            f"{self.training}-X/3. After attention, x.mean(2).mean(1) of [#timestamps, 1, comp_dim]",
+            x.mean(2).mean(1),
+            self.args.total_step,
+        )
+
+    def log_output(self, x):
+        self.args.debug_logger.writer.add_histogram(
+            f"{self.training}-X/4. After intervening nodes to input, input.mean(2).mean(0) of [#timestamps, #tokens (node + edge), embed_dim]",
+            x.mean(2).mean(0),
+            self.args.total_step,
+        )
+        self.args.debug_logger.writer.add_histogram(
+            f"{self.training}-X/4. After intervening nodes to input, input.mean(2).mean(1) of [#timestamps, #tokens (node + edge), embed_dim]",
+            x.mean(2).mean(1),
+            self.args.total_step,
+        )
+
+    def forward(self, x, padded_node_mask, padded_edge_mask, time_entirenodes_emdim):
         # x == [#timestamps, #tokens (edge features are removed), embed_dim]
         residual = x
-        x = self.layer_norm_in(x)
-        # self.args.debug_logger.writer.add_histogram(
-        #    f"{self.training}-X/0. input.mean(2).mean(0) of [#timestamps, #tokens (node + edge), embed_dim]",
-        #    x.mean(2).mean(0),
-        #    self.args.total_step,
-        # )
-        # self.args.debug_logger.writer.add_histogram(
-        #    f"{self.training}-X/0. input.mean(2).mean(1) of [#timestamps, #tokens (node + edge), embed_dim]",
-        #    x.mean(2).mean(1),
-        #    self.args.total_step,
-        # )
-        x = self.disentangler(x, padded_node_mask, padded_edge_mask)
+        self.log_input(x)
         # x == [#timestamps, #tokens, embed_dim] -> [#timestamps, 1, embed_dim]
-        # self.args.debug_logger.writer.add_histogram(
-        #    f"{self.training}-X/1. After pooling, x.mean(2).mean(1) of [#timestamps, 1, comp_dim]",
-        #    x.mean(2).mean(1),
-        #    self.args.total_step,
-        # )
-        # positional encoding. self.pe.shape == [max_position, embed_dim] -> [max_position, 1, embed_dim]
-        x = x + self.pe[: x.shape[0]].unsqueeze(1)
-        # self.args.debug_logger.writer.add_histogram(
-        #    f"{self.training}-X/2. After adding positional encoding, x.mean(2).mean(1) of [#timestamps, 1, comp_dim]",
-        #    x.mean(2).mean(1),
-        #    self.args.total_step,
-        # )
+        x = self.disentangler.encode(
+            x, padded_node_mask, padded_edge_mask, time_entirenodes_emdim
+        )
+        self.log_encode(x)
         # attention map is [#timestamps, #timestamps]
         x, attn = super().forward(x, x, x, attn_bias=None, customize=True)
-        # self.args.debug_logger.writer.add_histogram(
-        #    f"{self.training}-X/3. After attention, x.mean(2).mean(1) of [#timestamps, 1, comp_dim]",
-        #    x.mean(2).mean(1),
-        #    self.args.total_step,
-        # )
+        self.log_att(x)
         # [#timestamps, 1, embed_dim] -> [#timestamps(some elementes are dropped), 1, embed_dim]
-        x = self.drop_path(x)
+        # x = self.drop_path(x)
         # [#timestamps, 1, embed_dim] -> [#timestamps, #tokens, embed_dim]
-
-        x = self.to_embed_dim(x) + residual
-        # self.args.debug_logger.writer.add_histogram(
-        #    f"{self.training}-X/4. After intervening nodes to input, input.mean(2).mean(0) of [#timestamps, #tokens (node + edge), embed_dim]",
-        #    residual.mean(2).mean(0),
-        #    self.args.total_step,
-        # )
-        # self.args.debug_logger.writer.add_histogram(
-        #    f"{self.training}-X/4. After intervening nodes to input, input.mean(2).mean(1) of [#timestamps, #tokens (node + edge), embed_dim]",
-        #    residual.mean(2).mean(1),
-        #    self.args.total_step,
-        # )
-        return x, None
+        self.log_output(residual)
+        return residual, self.disentangler.decode(x, padded_node_mask, padded_edge_mask)
 
     def load_positional_encoding(self, dim_feature=1, max_position=1000, device="cpu"):
         """

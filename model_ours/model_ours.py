@@ -13,17 +13,7 @@ from model_ours.modules.model_tokengt import TokenGTModel
 from model_ours.modules.multihead_attention import MultiheadAttention
 from model_ours.trainer_ours import TrainerOurs
 from model_ours.tester_ours import TesterOurs
-
-
-class MultiplyPredictor(torch.nn.Module):
-    def __init__(self):
-        super(MultiplyPredictor, self).__init__()
-
-    def forward(self, z, e):
-        x_i = z[e[0]]
-        x_j = z[e[1]]
-        x = (x_i * x_j).sum(dim=1)
-        return torch.sigmoid(x)
+from utils_main import MultiplyPredictor
 
 
 class CustomMultiheadAttention(MultiheadAttention):
@@ -186,8 +176,8 @@ class OurModel(nn.Module):
         args = self.main_model.args
         self.args = args
         self.attention = Attention(args, num_nodes)
-        self.cs_decoder = MultiplyPredictor()
         self.scatter_and_gather = ScatterAndGather(args, args.encoder_embed_dim)
+        self.cs_decoder = MultiplyPredictor()
 
         self.trainer = TrainerOurs(args, self, data_to_prepare)
         self.tester = TesterOurs(args, self, data_to_prepare)
@@ -243,9 +233,11 @@ class OurModel(nn.Module):
 
         tr_input = self._get_tr_input(list_of_dgl_graphs)
         # [sum(activated_nodes) of all the timestamps, embed_dim]
-        embeddings, entire_node_feature = self.main_model(tr_input, get_embedding=True)
+        embeddings, time_entirenodes_emdim = self.main_model(
+            tr_input, get_embedding=True
+        )
 
         t_entire_embeddings = self.scatter_and_gather._to_entire(
-            embeddings, tr_input, entire_node_feature
+            embeddings, tr_input, entire_features=time_entirenodes_emdim
         )
         return t_entire_embeddings, tr_input

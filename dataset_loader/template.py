@@ -4,6 +4,8 @@ import random
 import numpy as np
 from loguru import logger
 
+SEED = None
+
 
 def fix_seed(seed):
     """Fix random seed"""

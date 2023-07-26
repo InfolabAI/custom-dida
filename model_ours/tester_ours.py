@@ -26,6 +26,7 @@ class TesterOurs(TrainerAndTester):
         with torch.no_grad():
             embeddings, tr_input = self.model(data, epoch=epoch, is_train=False)
 
+            # t+1 에 대한 추론을 해야하는데, 마지막에는 t+1 정보가 없기에 -1
             for t in range(self.runnerProperty.len - 1):
                 z = embeddings[t]
                 _, pos_edge, neg_edge = self.prepare(t + 1)[:3]

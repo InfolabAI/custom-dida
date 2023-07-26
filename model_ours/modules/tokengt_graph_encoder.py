@@ -317,7 +317,7 @@ class TokenGTGraphEncoder(nn.Module):
 
         st = time.time()
         attn_dict = {"maps": {}, "padded_index": padded_index}
-        entire_node_feature = None
+        time_entirenodes_emdim = None
         for i in range(len(self.layers)):
             layer = self.layers[i]
             x, attn = layer(
@@ -328,12 +328,12 @@ class TokenGTGraphEncoder(nn.Module):
             )
 
             if self.args.propagate == "inneraug":
-                x, entire_node_feature = self.propagate_info(
+                time_entirenodes_emdim = self.propagate_info(
                     x,
                     padded_node_mask,
                     padded_edge_mask,
                     batched_data,
-                    entire_node_feature,
+                    time_entirenodes_emdim,
                     i,
                 )
             else:
@@ -347,7 +347,7 @@ class TokenGTGraphEncoder(nn.Module):
         # x: T x B x C -> B x T x C -> (node_num) x C
         node_data = x.transpose(0, 1)[padded_node_mask, :]
         # logger.debug(f"ET [pure forward]: {time.time() - st:.5f}")
-        return node_data, entire_node_feature
+        return node_data, time_entirenodes_emdim
 
     def propagate_info(
         self,
@@ -355,10 +355,14 @@ class TokenGTGraphEncoder(nn.Module):
         padded_node_mask,
         padded_edge_mask,
         batched_data,
-        entire_node_feature,
+        time_entirenodes_emdim,
         i,
     ):
         # x: [#tokens, #timestamps, embed dim] -> [#timestamps, #tokens, embed dim]
-        x = x.transpose(0, 1)
-        x, entire_node_feature = self.custom[i](x, padded_node_mask, padded_edge_mask)
-        return x.transpose(0, 1), entire_node_feature
+        _, time_entirenodes_emdim = self.custom[i](
+            x.transpose(0, 1),
+            padded_node_mask,
+            padded_edge_mask,
+            time_entirenodes_emdim,
+        )
+        return time_entirenodes_emdim

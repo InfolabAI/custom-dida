@@ -3,10 +3,6 @@ import torch
 from loguru import logger
 from utils_main import setargs
 
-logger.critical(
-    "You should set appropriate --warmup-updates and --total-num-update for polynomial_decay (lr)"
-)
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--log_dir", type=str, default="logs/performance/")
 # Transformer
@@ -45,7 +41,7 @@ parser.add_argument(
 parser.add_argument(
     "--propagate",
     type=str,
-    default="dyaug",
+    default="no",
     help="inneraug | dyaug | no",
 )
 parser.add_argument(
@@ -56,9 +52,7 @@ parser.add_argument(
 
 
 # experiments
-parser.add_argument(
-    "--model", type=str, help="tokengt_nocd | tokengt_cd | tokengt_cdrandom | dida"
-)
+parser.add_argument("--model", type=str, help="ours | dida | dyformer")
 parser.add_argument(
     "--max_epoch", type=int, default=500, help="number of epochs to train."
 )
@@ -132,6 +126,8 @@ else:
 
 logger.info("minnum_nodes_for_a_community:{}".format(args.minnum_nodes_for_a_community))
 
+if args.model == "gcrn":
+    setargs(args, {"lr": 0.001, "weight_decay": 5e-9})
 # For DIDA
 if args.use_cfg:
     if args.dataset == "collab":

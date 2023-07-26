@@ -103,6 +103,32 @@ class ConvertGraphTypes:
 
         return graph
 
+    def dict_to_list_of_networkxG(self, data_dict):
+        """
+        Parameters:
+        data_dict: dict: we assume that data_dict.keys() is ['x', 'train', 'test'] and data_dict['train'].keys() is ['edge_index', 'pedges', 'nedges', 'weights']
+        """
+        node_features = data_dict["x"]
+
+        list_of_networkx_graphs = []
+        for t, edge_tensor in enumerate(data_dict["train"]["pedges"]):
+            edge_feature_dict = data_dict["train"]["weights"][t]
+
+            # Create a NetworkX graph
+            G = nx.MultiGraph()
+
+            # Add nodes with features to the graph
+            for node_id, features in enumerate(node_features):
+                G.add_node(node_id, w=features)
+
+            # Add edges with features to the graph
+            for (src, dst), weight in edge_feature_dict.items():
+                G.add_edge(src, dst, w=weight)
+
+            list_of_networkx_graphs.append(G)
+
+        return list_of_networkx_graphs
+
     def dict_to_list_of_dglG(self, dict, device):
         """
         Parameters

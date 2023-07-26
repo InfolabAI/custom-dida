@@ -1,11 +1,43 @@
 import os
 import torch
+import dgl
 import random
 import numpy as np
 import torch
 import subprocess
 from loguru import logger
 from datetime import datetime
+from dataset_loader.utils_data import negative_sampling as tiara_negative_sampling
+from torch_geometric.utils import negative_sampling
+
+
+def negative_sampling_(**args):
+    if args["dataset"] == "yelp":
+        neg_edge_index = bi_negative_sampling(
+            args["pos"], args["num_nodes"], args["shift"]
+        )
+    elif (
+        args["dataset"] == "bitcoin"
+        or args["dataset"] == "redditbody"
+        or args["dataset"] == "wikielec"
+    ):
+        neg_edge_index = tiara_negative_sampling(
+            args["data_to_prepare"]["adj_lists"][args["t"] + 1]
+        )
+        neg_edge_index = (
+            torch.tensor(neg_edge_index, dtype=torch.long, device=args["pos"].device)
+            .reshape(-1, 2)
+            .t()
+        )
+    elif args["dataset"] == "collab":
+        neg_edge_index = negative_sampling(
+            args["pos"],
+            num_neg_samples=args["num_neg_samples"],
+        )
+    else:
+        raise NotImplementedError
+
+    return neg_edge_index
 
 
 def get_gpu_memory_usage(device_id):
@@ -161,3 +193,47 @@ def bi_negative_sampling(edges, num_nodes, shift):
 import os, sys
 
 CUR_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def sparse_diag(input):
+    N = input.shape[0]
+    arr = torch.arange(N, device=input.device)
+    indices = torch.stack([arr, arr])
+    return torch.sparse_coo_tensor(indices, input, (N, N))
+
+
+def normalize_graph(graph, ord="sym"):
+    adj = graph.adj(ctx=graph.device).coalesce()
+
+    if ord == "row":
+        norm = torch.sparse.sum(adj, dim=1).to_dense()
+        norm[norm <= 0] = 1
+        inv_D = sparse_diag(1 / norm)
+        new_adj = inv_D @ adj
+    elif ord == "col":
+        norm = torch.sparse.sum(adj, dim=0).to_dense()
+        norm[norm <= 0] = 1
+        inv_D = sparse_diag(1 / norm)
+        new_adj = adj @ inv_D
+    elif ord == "sym":
+        norm = torch.sparse.sum(adj, dim=1).to_dense()
+        norm[norm <= 0] = 1
+        inv_D = sparse_diag(norm ** (-0.5))
+        new_adj = inv_D @ adj @ inv_D
+
+    new_adj = new_adj.coalesce()
+    indices = new_adj.indices()
+    new_graph = dgl.graph((indices[0, :], indices[1, :]))
+    new_graph.edata["w"] = new_adj.values()
+    return new_graph
+
+
+class MultiplyPredictor(torch.nn.Module):
+    def __init__(self):
+        super(MultiplyPredictor, self).__init__()
+
+    def forward(self, z, e):
+        x_i = z[e[0]]
+        x_j = z[e[1]]
+        x = (x_i * x_j).sum(dim=1)
+        return torch.sigmoid(x)

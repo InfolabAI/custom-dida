@@ -3,8 +3,8 @@ import csv, math, os, shutil, wget
 import gzip, zipfile
 import time, dateutil.parser
 from loguru import logger
-from dataset_loader.template import DatasetTemplate
-from dataset_loader import utils_data
+from template import DatasetTemplate
+import utils_data
 from tqdm import tqdm
 
 
@@ -69,9 +69,11 @@ class LinkDatasetTemplate(DatasetTemplate):
                 adj_list[edge["from"]].append(edge["to"])
             adj_lists.append(adj_list)
             non_edges = utils_data.negative_sampling(adj_list)
-            non_edges = torch.tensor(
-                non_edges, dtype=torch.long, device=self.device
-            ).reshape(-1, 2)
+            non_edges = (
+                torch.tensor(non_edges, dtype=torch.long, device=self.device)
+                .reshape(-1, 2)
+                .t()
+            )
             temporal_non_edges.append(non_edges)
 
         self.adj_lists = adj_lists

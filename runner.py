@@ -36,13 +36,18 @@ class RunnerProperty:
 
 
 def set_optimizer(args, model):
-    if args.model == "dida":
+    if (
+        args.model == "dida"
+        or args.model == "gcn"
+        or args.model == "evolvegcn"
+        or args.model == "gcrn"
+    ):
         optimizer = optim.Adam(
             [p for n, p in model.named_parameters() if "ss" not in n],
             lr=args.lr,
             weight_decay=args.weight_decay,
         )
-        return (optimizer), (None)
+        return (optimizer,), (None,)
     elif args.model == "ours":
         # graph attention model
         optimizer0 = optim.Adam(
@@ -73,6 +78,9 @@ def set_optimizer(args, model):
             power=args.power,
         )
         return (optimizer0, optimizer1), (scheduler0, scheduler1)
+    elif args.model == "dyformer":
+        # DyFormer uses own optimizer and scheduler
+        return None, None
     else:
         raise NotImplementedError
 
@@ -117,6 +125,10 @@ class Runner(object):
 
         # complete checking shuffled data and not shuffled ori_data
         data = self.model.trainer.preprocess_data_per_run(self.data)
+        if self.args.model == "dyformer":
+            # DyFormer uses own training code and test code. So self.model.trainer.train() process all the epochs for all the timestamps.
+            self.model.trainer.train(data)
+            return
         with tqdm(range(1, args.max_epoch + 1)) as bar:
             for epoch in bar:
                 self.epoch = epoch

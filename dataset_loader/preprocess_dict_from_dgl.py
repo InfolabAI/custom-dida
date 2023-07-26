@@ -1,6 +1,7 @@
 import os
 import torch
 import dgl
+from loguru import logger
 from dataset_loader.template import DatasetTemplate
 from utils_main import bi_negative_sampling
 
@@ -39,6 +40,7 @@ class PreprocessDictFromDGL:
         """
         Load dgl from folder and build dict from it
         """
+        logger.info("Building dict from dgl...")
         graph_dict = {}
         graph = self.load_pt_files_from_folder(
             dgl_folder_path, DatasetTemplate.load_from_path
@@ -54,14 +56,21 @@ class PreprocessDictFromDGL:
             )
         graph_dict["train"]["edge_index_list"] = graph_dict["train"]["pedges"]
         graph_dict["train"]["nedges"] = []
-        for edges_at_time_t in graph_dict["train"]["pedges"]:
-            graph_dict["train"]["nedges"] += [
-                bi_negative_sampling(
-                    edges_at_time_t,
-                    graph_dict["x"].shape[0],
-                    graph_dict["x"].shape[0] / 2,
-                )
-            ]
+        graph_dict["train"]["adj_lists"] = []
+        # 자체 negative sampling
+        # for edges_at_time_t in graph_dict["train"]["pedges"]:
+        #    graph_dict["train"]["nedges"] += [
+        #        bi_negative_sampling(
+        #            edges_at_time_t,
+        #            graph_dict["x"].shape[0],
+        #            graph_dict["x"].shape[0] / 2,
+        #        )
+        #    ]
+
+        # TiaRa 에서 sample 된 nagative edge 가져오기
+        for t in range(len(graph_dict["train"]["pedges"])):
+            graph_dict["train"]["nedges"] += [graph.non_edges[t]]
+            graph_dict["train"]["adj_lists"] += [graph.adj_lists[t]]
 
         try:
             os.makedirs(dict_graph_folder_path)

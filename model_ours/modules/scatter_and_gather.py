@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from loguru import logger
 from torch_scatter import scatter
 
 
@@ -31,12 +32,10 @@ class ScatterAndGather(nn.Module):
         )
         self.step = 0
 
-    def _to_entire(self, x, batched_data, entire_node_feature=None, use_bd=True):
+    def _to_entire(self, x, batched_data, entire_features=None, is_mlp=True):
         offset = 0
         t_entire_embeddings = []
-        comm_ta = 0
-        comm_bd = 0
-        comm_en = 0
+        ta_mean, bd_mean = 0, 0
         for t, (node_num, activated_indices) in enumerate(
             zip(batched_data["node_num"], batched_data["indices_subnodes"])
         ):
@@ -53,31 +52,25 @@ class ScatterAndGather(nn.Module):
 
             ta = t_activated_embedding
             bd = batched_data["x"]
-            comm_ta += ta.abs().mean()
-            comm_bd += bd.abs().mean()
-            if entire_node_feature is not None:
-                en = torch.nn.functional.sigmoid(
-                    self.layer_norm_en(entire_node_feature[t])
-                )
-                comm_en += en.abs().mean()
 
-                input_ = ta + bd * en
-            else:
-                if use_bd:
-                    input_ = ta + bd
-                else:
-                    input_ = ta
+            ta_mean += ta.abs().mean()
+            bd_mean += bd.abs().mean()
 
-            t_embedding = self.mlp_d(self.layer_norm_d(input_))
-            # t_embedding = self.mlp_d(input_)
-            # t_embedding = torch.nn.functional.adaptive_avg_pool1d(input_, self.comp_dim)
+            input_ = ta + bd
+            t_embedding = self.mlp_d(self.layer_norm_d(input_)) if is_mlp else input_
+
             t_entire_embeddings.append(t_embedding)
-        # node_features are the same across all the timestamps, so, we use [0]
-        # if entire_node_feature is not None:
-        #     print(
-        #         f"comm_ta/comm_bd: {comm_ta/(comm_bd + 1e-8)}, comm_en/comm_bd: {comm_en/(comm_bd + 1e-8)}"
-        #     )
-        return torch.stack(t_entire_embeddings, dim=0)
+
+        ret = torch.stack(t_entire_embeddings, dim=0)
+        if entire_features is not None:
+            ret = ret + entire_features
+            # logger.info(
+            #    f"ret: {ret.abs().mean():.2f} entire_features: {entire_features.abs().mean():.2f} ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
+            # )
+        else:
+            pass
+            # logger.info("entire_features is None")
+        return ret
 
     def _from_entire(self, x, batched_data):
         node_features = []

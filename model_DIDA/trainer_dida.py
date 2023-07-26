@@ -62,15 +62,15 @@ class Trainer_DIDA(TrainerAndTester):
         for t in range(self.runnerProperty.len_train - 1):
             z = embeddings[t]  # only used for obtaining dimension
             pos_edge_index = self.prepare(t + 1)[0]
-            if args.dataset == "yelp":
-                neg_edge_index = bi_negative_sampling(
-                    pos_edge_index, args.num_nodes, args.shift
-                )
-            else:
-                neg_edge_index = negative_sampling(
-                    pos_edge_index,
-                    num_neg_samples=pos_edge_index.size(1) * args.sampling_times,
-                )
+            neg_edge_index = negative_sampling_(
+                pos=pos_edge_index,
+                num_nodes=args.num_nodes,
+                shift=args.shift,
+                num_neg_samples=pos_edge_index.size(1) * args.sampling_times,
+                data_to_prepare=self.data_to_prepare,
+                t=t,
+                dataset=args.dataset,
+            )
             edge_index.append(torch.cat([pos_edge_index, neg_edge_index], dim=-1))
             pos_y = z.new_ones(pos_edge_index.size(1)).to(device)
             neg_y = z.new_zeros(neg_edge_index.size(1)).to(device)

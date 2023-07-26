@@ -1,8 +1,39 @@
 import os
 import random
 import torch
+import numpy as np
 from loguru import logger
-from utils_main import remove_duplicated_edges, seed_everything
+
+
+def remove_duplicated_edges(edges):
+    """
+    Args:
+        edges (tensor): [2, #edges]
+    """
+    # duplicated edges are [src1, dst1] and [dst1, src1], so we sort them and remove the duplicated ones
+    # edges (tensor): [2, #edges]
+    original_edge_num = edges.shape[1]
+    edges = (torch.sort(edges, dim=0)[0]).unique(dim=1)
+    remove_dup_edge_num = edges.shape[1]
+    edges = edges[:, edges[0] != edges[1]]
+    remove_self_loop = edges.shape[1]
+    logger.debug(
+        f"Remove duplicated edges: {original_edge_num - remove_dup_edge_num} and self-loop edges: {remove_dup_edge_num - remove_self_loop}"
+    )
+    return edges
+
+
+def seed_everything(seed: int):
+    r"""Sets the seed for generating random numbers in PyTorch, numpy and
+    Python.
+
+    Args:
+        seed (int): The desired seed.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def mkdirs(path):
@@ -19,6 +50,7 @@ def prepare_dir(output_folder):
 
 def load_data(args, dataset=None):
     seed_everything(0)
+    args.shift = None
     if dataset is None:
         dataset = args.dataset
 
@@ -132,15 +164,20 @@ def load_data(args, dataset=None):
     )
 
     data["train"]["weights"] = []
-    for t, edge_tensor in enumerate(data["train"]["pedges"]):
-        edge_tensor = remove_duplicated_edges(edge_tensor)
+    for t, (pedge_tensor, nedge_tensor) in enumerate(
+        zip(data["train"]["pedges"], data["train"]["nedges"])
+    ):
+        pedge_tensor = remove_duplicated_edges(pedge_tensor)
+        nedge_tensor = remove_duplicated_edges(nedge_tensor)
         weights_t = {}
-        for i, j in zip(edge_tensor[0], edge_tensor[1]):
+        for i, j in zip(pedge_tensor[0], pedge_tensor[1]):
             weights_t[(int(i), int(j))] = 1.0
             # weights_t[(int(j), int(i))] = 1.0
 
         data["train"]["weights"].append(weights_t)
-        data["train"]["pedges"][t] = edge_tensor
+        data["train"]["pedges"][t] = pedge_tensor
+        # pedge 와 동일한 길이로 맞춤
+        data["train"]["nedges"][t] = nedge_tensor[:, : pedge_tensor.shape[1]]
         data["train"]["edge_index_list"] = data["train"]["pedges"]
 
     return args, data

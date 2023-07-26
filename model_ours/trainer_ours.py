@@ -1,6 +1,5 @@
 import time
 from trainer_and_tester import TrainerAndTester
-from torch_geometric.utils import negative_sampling
 from utils_main import *
 from tqdm import tqdm
 
@@ -34,17 +33,17 @@ class TrainerOurs(TrainerAndTester):
 
         for t in range(train_len):
             z = embeddings[t]
-
             pos_edge_index = self.prepare(t + 1)[0]
-            if args.dataset == "yelp":
-                neg_edge_index = bi_negative_sampling(
-                    pos_edge_index, args.num_nodes, args.shift
-                )
-            else:
-                neg_edge_index = negative_sampling(
-                    pos_edge_index,
-                    num_neg_samples=pos_edge_index.size(1) * args.sampling_times,
-                )
+            neg_edge_index = negative_sampling_(
+                pos=pos_edge_index,
+                num_nodes=args.num_nodes,
+                shift=args.shift,
+                num_neg_samples=pos_edge_index.size(1) * args.sampling_times,
+                data_to_prepare=self.data_to_prepare,
+                t=t,
+                dataset=args.dataset,
+            )
+
             edge_index = torch.cat([pos_edge_index, neg_edge_index], dim=-1)
             pos_y = z.new_ones(pos_edge_index.size(1)).to(z.device)
             neg_y = z.new_zeros(neg_edge_index.size(1)).to(z.device)
@@ -59,15 +58,15 @@ class TrainerOurs(TrainerAndTester):
             ortho_loss += custom.disentangler.ortho_loss * 0.5
         loss_concat = torch.concat(loss_list, dim=0)
         loss_mean = loss_concat.mean()
-        loss_total = loss_mean + ortho_loss
-        logger.info(
-            f"loss_mean: {loss_mean:.3f}, loss_variation: {torch.nn.functional.mse_loss(loss_concat.detach(), loss_mean.detach().expand_as(loss_concat.detach())):.5f}, othogonality_loss: {ortho_loss.detach():.7f}"
-        )
+        loss_total = loss_mean  # + ortho_loss
+        # logger.info(
+        #    f"loss_mean: {loss_mean:.3f}, loss_variation: {torch.nn.functional.mse_loss(loss_concat.detach(), loss_mean.detach().expand_as(loss_concat.detach())):.5f}, othogonality_loss: {ortho_loss.detach():.7f}"
+        # )
 
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()
         loss_total.backward()
-        # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1e-5)
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip_norm)
         scheduler[0].step()
         scheduler[1].step()
         if self.args.loguru_level == "DEBUG" and (epoch % 50 == 0 or epoch == 1):
