@@ -15,9 +15,6 @@ class ScatterAndGather(nn.Module):
         self.comp_dim = comp_dim
         self.args = args
         self.layer_norm_d = nn.LayerNorm(embed_dim)
-        self.layer_norm_ta = nn.LayerNorm(embed_dim)
-        self.layer_norm_bd = nn.LayerNorm(embed_dim)
-        self.layer_norm_en = nn.LayerNorm(1)
         self.mlp_d = nn.Sequential(
             nn.Linear(embed_dim, 2 * embed_dim),
             nn.GELU(),
@@ -64,9 +61,9 @@ class ScatterAndGather(nn.Module):
         ret = torch.stack(t_entire_embeddings, dim=0)
         if entire_features is not None:
             ret = ret + entire_features
-            # logger.info(
-            #    f"ret: {ret.abs().mean():.2f} entire_features: {entire_features.abs().mean():.2f} ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
-            # )
+            logger.info(
+                f"ret: {ret.abs().mean():.2f} entire_features: {entire_features.abs().mean():.2f} ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
+            )
         else:
             pass
             # logger.info("entire_features is None")

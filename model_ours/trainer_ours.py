@@ -39,7 +39,6 @@ class TrainerOurs(TrainerAndTester):
                 num_nodes=args.num_nodes,
                 shift=args.shift,
                 num_neg_samples=pos_edge_index.size(1) * args.sampling_times,
-                data_to_prepare=self.data_to_prepare,
                 t=t,
                 dataset=args.dataset,
             )

@@ -223,15 +223,10 @@ class OurModel(nn.Module):
         return propagated_list_of_dgl_graphs
 
     def forward(self, list_of_dgl_graphs, epoch, is_train):
-        if self.args.propagate != "dyaug":
-            pass
-        else:
-            propagated_list_of_dgl_graphs = self._get_propagated_graphs(
-                list_of_dgl_graphs
-            )
-            list_of_dgl_graphs = propagated_list_of_dgl_graphs
-
         tr_input = self._get_tr_input(list_of_dgl_graphs)
+        self.args
+        setattr(self.args, "batched_data", tr_input)
+        setattr(self.args, "list_of_dgl_graphs", list_of_dgl_graphs)
         # [sum(activated_nodes) of all the timestamps, embed_dim]
         embeddings, time_entirenodes_emdim = self.main_model(
             tr_input, get_embedding=True

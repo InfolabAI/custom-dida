@@ -21,8 +21,11 @@ def negative_sampling_(**args):
         or args["dataset"] == "redditbody"
         or args["dataset"] == "wikielec"
     ):
+        adj_lists = [[] for _ in range(args["num_nodes"])]
+        for s, t in zip(args["pos"][0], args["pos"][1]):
+            adj_lists[int(s.cpu())].append(int(t.cpu()))
         neg_edge_index = tiara_negative_sampling(
-            args["data_to_prepare"]["adj_lists"][args["t"] + 1]
+            adj_lists,
         )
         neg_edge_index = (
             torch.tensor(neg_edge_index, dtype=torch.long, device=args["pos"].device)

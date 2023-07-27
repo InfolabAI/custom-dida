@@ -14,10 +14,10 @@ class Disentangler(nn.Module):
         self.comp_dim = comp_dim
         self.encode_layer_norm = nn.LayerNorm(embed_dim)
         self.encode_final_layer_norm = nn.LayerNorm(comp_len * comp_dim)
-        self.decode_norm = nn.LayerNorm(comp_dim)
+        self.decode_norm = nn.LayerNorm(embed_dim)
         self.scga = ScatterAndGather(args, embed_dim)
         self.node_comp_mlps = nn.ModuleList(
-            {
+            [
                 nn.Sequential(
                     nn.Linear(embed_dim, self.comp_dim * 2),
                     nn.GELU(),
@@ -25,13 +25,18 @@ class Disentangler(nn.Module):
                     nn.Linear(self.comp_dim * 2, self.comp_dim),
                 )
                 for _ in range(self.comp_len)
-            }
+            ]
         )
-        self.node_decomp_mlps = nn.Sequential(
-            nn.Linear(self.comp_dim, self.comp_dim * 2),
-            nn.GELU(),
-            nn.Dropout1d(0.1),
-            nn.Linear(self.comp_dim * 2, embed_dim),
+        self.node_decomp_mlps = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Linear(comp_dim, comp_dim * 2),
+                    nn.GELU(),
+                    nn.Dropout1d(0.1),
+                    nn.Linear(comp_dim * 2, embed_dim),
+                )
+                for _ in range(self.comp_len)
+            ]
         )
         self.ortho_loss = torch.zeros(1).squeeze(0).float().to(args.device)
 
@@ -49,23 +54,33 @@ class Disentangler(nn.Module):
         time_entirenodes_emdim = self.scga._to_entire(
             nodes, self.args.batched_data, time_entirenodes_emdim, is_mlp=False
         )
+        tee = time_entirenodes_emdim
 
-        entire_indices = np.arange(time_entirenodes_emdim.shape[1])
-        # shuffle 하면 test AUC 0.6 이 한계, shuffle 안하면 0.7 가능
-        # if self.training:
-        #    np.random.shuffle(entire_indices)
-        self.indices_history = np.array_split(entire_indices, self.comp_len)
-        for i, indices in enumerate(self.indices_history):
-            compressed_x_list.append(
-                self.node_comp_mlps[i](time_entirenodes_emdim[:, indices, :]).sum(
-                    1, keepdim=True
-                )
-                / len(indices)
+        t_feat_list = []
+        self.indices_history = []
+        for t in range(tee.shape[0]):
+            activated_node_indices = self.args.batched_data["indices_subnodes"][t]
+            deactivated_node_indices = np.setdiff1d(
+                np.arange(tee.shape[1]), activated_node_indices.numpy()
             )
-        compressed_x = self.encode_final_layer_norm(torch.cat(compressed_x_list, dim=2))
-        self.ortho_loss = self.orthogonality_loss(*compressed_x_list)
+            ac_feat = tee[:, activated_node_indices, :].sum(1, keepdim=True) / len(
+                activated_node_indices
+            )
+            ac_feat = self.node_comp_mlps[0](ac_feat)
+            deac_feat = tee[:, deactivated_node_indices, :].sum(1, keepdim=True) / len(
+                deactivated_node_indices
+            )
+            deac_feat = self.node_comp_mlps[1](deac_feat)
+            t_feat = torch.concat([ac_feat, deac_feat], dim=2)
+            t_feat_list.append(t_feat)
+            self.indices_history.append(
+                (activated_node_indices, deactivated_node_indices)
+            )
 
-        return compressed_x
+        feat = self.encode_final_layer_norm(torch.cat(t_feat_list, dim=1))
+        self.ortho_loss = self.orthogonality_loss(*t_feat_list)
+
+        return feat
 
     def decode(self, x, padded_node_mask, padded_edge_mask):
         """
@@ -74,18 +89,24 @@ class Disentangler(nn.Module):
         x: torch.Tensor
             [#timestamps, #tokens (node + edge), embed_dim]
         """
-        time_entirenodes_emdim = torch.zeros(
-            x.shape[0], self.args.num_nodes, self.comp_dim, device=x.device
-        )
-        for indices, tensor in zip(
-            self.indices_history, torch.split(x, self.comp_dim, dim=2)
-        ):
-            time_entirenodes_emdim[:, indices, :] += tensor
-        time_entirenodes_emdim = self.node_decomp_mlps(
-            self.decode_norm(time_entirenodes_emdim)
-        )
+        tee_list = []
+        for t, indices in enumerate(self.indices_history):
+            t_x = x[:, t, :].unsqueeze(1)
+            t_tee = torch.zeros(
+                1, self.args.num_nodes, self.embed_dim, device=t_x.device
+            )
+            [ac_feat, deac_feat] = torch.split(
+                t_x[t].unsqueeze(0), self.comp_dim, dim=2
+            )
+            ac_feat = self.node_decomp_mlps[0](ac_feat)
+            deac_feat = self.node_decomp_mlps[1](deac_feat)
+            t_tee[:, indices[0], :] += ac_feat
+            t_tee[:, indices[1], :] += deac_feat
+            tee_list.append(t_tee)
 
-        return time_entirenodes_emdim
+        tee = self.decode_norm(torch.concat(tee_list, dim=0))
+
+        return tee
 
     def orthogonality_loss(self, *tensors):
         """

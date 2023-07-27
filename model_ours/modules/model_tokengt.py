@@ -230,7 +230,6 @@ class TokenGTModel(FairseqEncoderModel):
     def forward(self, batched_data, **kwargs):
         # batched_data["node_data"] = self.stem(batched_data["node_data"])
         # batched_data["edge_data"] = nn.functional.adaptive_avg_pool1d( batched_data["edge_data"], batched_data["node_data"].shape[1])
-        setattr(self.args, "batched_data", batched_data)
         node_data = self.encoder(batched_data, **kwargs)
         st = time.time()
         if "get_embedding" in kwargs:
