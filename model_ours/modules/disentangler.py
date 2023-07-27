@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from itertools import zip_longest
 from .scatter_and_gather import ScatterAndGather
 
 
@@ -13,7 +14,9 @@ class Disentangler(nn.Module):
         self.comp_len = comp_len
         self.comp_dim = comp_dim
         self.encode_layer_norm = nn.LayerNorm(embed_dim)
-        self.encode_final_layer_norm = nn.LayerNorm(comp_len * comp_dim)
+        self.encode_final_layer_norm = nn.LayerNorm(
+            comp_len * comp_dim * (args.len_train - 1)
+        )
         self.decode_norm = nn.LayerNorm(embed_dim)
         self.scga = ScatterAndGather(args, embed_dim)
         self.node_comp_mlps = nn.ModuleList(
@@ -21,7 +24,7 @@ class Disentangler(nn.Module):
                 nn.Sequential(
                     nn.Linear(embed_dim, self.comp_dim * 2),
                     nn.GELU(),
-                    nn.Dropout1d(0.1),
+                    # nn.Dropout1d(0.1),
                     nn.Linear(self.comp_dim * 2, self.comp_dim),
                 )
                 for _ in range(self.comp_len)
@@ -32,7 +35,7 @@ class Disentangler(nn.Module):
                 nn.Sequential(
                     nn.Linear(comp_dim, comp_dim * 2),
                     nn.GELU(),
-                    nn.Dropout1d(0.1),
+                    # nn.Dropout1d(0.1),
                     nn.Linear(comp_dim * 2, embed_dim),
                 )
                 for _ in range(self.comp_len)
@@ -77,7 +80,8 @@ class Disentangler(nn.Module):
                 (activated_node_indices, deactivated_node_indices)
             )
 
-        feat = self.encode_final_layer_norm(torch.cat(t_feat_list, dim=1))
+        feat_cat = torch.cat(t_feat_list[: self.args.len_train - 1], dim=2)
+        feat = self.encode_final_layer_norm(feat_cat)
         self.ortho_loss = self.orthogonality_loss(*t_feat_list)
 
         return feat
@@ -90,18 +94,20 @@ class Disentangler(nn.Module):
             [#timestamps, #tokens (node + edge), embed_dim]
         """
         tee_list = []
-        for t, indices in enumerate(self.indices_history):
-            t_x = x[:, t, :].unsqueeze(1)
-            t_tee = torch.zeros(
-                1, self.args.num_nodes, self.embed_dim, device=t_x.device
-            )
+        for t, (indices, t_x) in enumerate(
+            zip_longest(self.indices_history, torch.split(x, self.comp_dim * 2, dim=2))
+        ):
+            t_tee = torch.zeros(1, self.args.num_nodes, self.embed_dim, device=x.device)
+            if t_x is None:
+                tee_list.insert(0, t_tee)
+                continue
             [ac_feat, deac_feat] = torch.split(
                 t_x[t].unsqueeze(0), self.comp_dim, dim=2
             )
             ac_feat = self.node_decomp_mlps[0](ac_feat)
             deac_feat = self.node_decomp_mlps[1](deac_feat)
-            t_tee[:, indices[0], :] += ac_feat
-            t_tee[:, indices[1], :] += deac_feat
+            t_tee[:, indices[0], :] += ac_feat / len(indices[0])
+            t_tee[:, indices[1], :] += deac_feat / len(indices[1])
             tee_list.append(t_tee)
 
         tee = self.decode_norm(torch.concat(tee_list, dim=0))

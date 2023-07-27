@@ -180,6 +180,7 @@ def load_data(args, dataset=None):
         data["train"]["nedges"][t] = nedge_tensor[:, : pedge_tensor.shape[1]]
         data["train"]["edge_index_list"] = data["train"]["pedges"]
 
+    args.len_train = args.length - args.testlength - args.vallength
     return args, data
 
 

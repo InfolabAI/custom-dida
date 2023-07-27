@@ -24,12 +24,12 @@ class CustomMultiheadAttention(MultiheadAttention):
         # nodes 를 몇 개로 나눌 것인가
         comp_len = 2
         # 나누어진 각각의 node basket 에 대해 몇개 씩의 feature 를 추출할 것인가
-        comp_dim = 128
-        disentangle_dim = comp_dim * comp_len
+        comp_dim = 16
+        disentangle_dim = comp_dim * comp_len * (args.len_train - 1)
         super().__init__(
             disentangle_dim,
             # 각 head 는 하나의 comp_dim 에 대해 attention 을 수행함
-            comp_len,
+            comp_len * (args.len_train - 1),
             attention_dropout=attention_dropout,
             self_attention=True,
         )
