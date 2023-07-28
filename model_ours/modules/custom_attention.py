@@ -42,7 +42,8 @@ class CustomMultiheadAttention(MultiheadAttention):
         )
 
         self.args = args
-        self.drop_path = DropPath(0.1, dim=0)
+        self.drop_path0d = DropPath(0.5, dim=0)
+        self.drop_path2d = DropPath(0.5, dim=2)
         self.load_positional_encoding(disentangle_dim, 1000, args.device)
         self.step = 0
 
@@ -91,22 +92,49 @@ class CustomMultiheadAttention(MultiheadAttention):
             self.args.total_step,
         )
 
-    def forward(self, x, padded_node_mask, padded_edge_mask, time_entirenodes_emdim):
+    def forward(
+        self,
+        x,
+        padded_node_mask,
+        padded_edge_mask,
+        t_embedding,
+        t_embedding_drop,
+    ):
         # x == [#timestamps, #tokens (edge features are removed), embed_dim]
         residual = x
         self.log_input(x)
         # x == [#timestamps, #tokens, embed_dim] -> [#timestamps, 1, embed_dim]
-        x = self.disentangler.encode(
-            x, padded_node_mask, padded_edge_mask, time_entirenodes_emdim
+        t_embedding = self.disentangler.encode(
+            x, padded_node_mask, padded_edge_mask, t_embedding
         )
-        self.log_encode(x)
+        t_embedding_drop = self.disentangler.encode(
+            x, padded_node_mask, padded_edge_mask, t_embedding_drop
+        )
+        # self.log_encode(x)
         # attention map is [#timestamps, #timestamps]
-        x, attn = super().forward(x, x, x, attn_bias=None, customize=True)
-        self.log_att(x)
+        t_embedding, attn = super().forward(
+            t_embedding, t_embedding, t_embedding, attn_bias=None, customize=True
+        )
+        # self.log_att(x)
+        t_embedding_0d_drop = self.drop_path0d(t_embedding_drop)
+        t_embedding_2d_drop = self.drop_path2d(t_embedding_drop)
+        t_embedding_drop, attn = super().forward(
+            t_embedding_0d_drop,
+            t_embedding_2d_drop,
+            t_embedding,
+            attn_bias=None,
+            customize=True,
+        )
         # [#timestamps, 1, embed_dim] -> [#timestamps(some elementes are dropped), 1, embed_dim]
         # x = self.drop_path(x)
         # [#timestamps, 1, embed_dim] -> [#timestamps, #tokens, embed_dim]
-        return residual, self.disentangler.decode(x, padded_node_mask, padded_edge_mask)
+        t_embedding_drop = self.disentangler.decode(
+            t_embedding_drop, padded_node_mask, padded_edge_mask
+        )
+        t_embedding = self.disentangler.decode(
+            t_embedding, padded_node_mask, padded_edge_mask
+        )
+        return residual, t_embedding, t_embedding_drop
 
     def load_positional_encoding(self, dim_feature=1, max_position=1000, device="cpu"):
         """

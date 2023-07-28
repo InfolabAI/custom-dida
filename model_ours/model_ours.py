@@ -228,9 +228,11 @@ class OurModel(nn.Module):
         setattr(self.args, "batched_data", tr_input)
         setattr(self.args, "list_of_dgl_graphs", list_of_dgl_graphs)
         # [sum(activated_nodes) of all the timestamps, embed_dim]
-        embeddings, t_entire_embeddings = self.main_model(tr_input, get_embedding=True)
+        embeddings, t_embeddings, t_embeddings_drop = self.main_model(
+            tr_input, get_embedding=True
+        )
 
         # t_entire_embeddings = self.scatter_and_gather._to_entire(
         #    embeddings, tr_input, entire_features=t_entier_embeddings
         # )
-        return t_entire_embeddings, tr_input
+        return t_embeddings, t_embeddings_drop, tr_input

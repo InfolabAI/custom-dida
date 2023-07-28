@@ -317,7 +317,8 @@ class TokenGTGraphEncoder(nn.Module):
 
         st = time.time()
         attn_dict = {"maps": {}, "padded_index": padded_index}
-        time_entirenodes_emdim = None
+        t_embedding = None
+        t_embedding_drop = None
         for i in range(len(self.layers)):
             layer = self.layers[i]
             x, attn = layer(
@@ -328,12 +329,13 @@ class TokenGTGraphEncoder(nn.Module):
             )
 
             if self.args.propagate == "inneraug":
-                time_entirenodes_emdim = self.propagate_info(
+                t_embedding, t_embedding_drop = self.propagate_info(
                     x,
                     padded_node_mask,
                     padded_edge_mask,
                     batched_data,
-                    time_entirenodes_emdim,
+                    t_embedding,
+                    t_embedding_drop,
                     i,
                 )
             else:
@@ -347,7 +349,7 @@ class TokenGTGraphEncoder(nn.Module):
         # x: T x B x C -> B x T x C -> (node_num) x C
         node_data = x.transpose(0, 1)[padded_node_mask, :]
         # logger.debug(f"ET [pure forward]: {time.time() - st:.5f}")
-        return node_data, time_entirenodes_emdim
+        return node_data, t_embedding, t_embedding_drop
 
     def propagate_info(
         self,
@@ -355,14 +357,16 @@ class TokenGTGraphEncoder(nn.Module):
         padded_node_mask,
         padded_edge_mask,
         batched_data,
-        time_entirenodes_emdim,
+        t_embedding,
+        t_embedding_drop,
         i,
     ):
         # x: [#tokens, #timestamps, embed dim] -> [#timestamps, #tokens, embed dim]
-        _, time_entirenodes_emdim = self.custom[i](
+        _, t_embedding, t_embedding_drop = self.custom[i](
             x.transpose(0, 1),
             padded_node_mask,
             padded_edge_mask,
-            time_entirenodes_emdim,
+            t_embedding,
+            t_embedding_drop,
         )
-        return time_entirenodes_emdim
+        return t_embedding, t_embedding_drop

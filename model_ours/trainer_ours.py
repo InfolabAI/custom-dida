@@ -23,7 +23,7 @@ class TrainerOurs(TrainerAndTester):
         optimizer = self.runnerProperty.optimizer
         scheduler = self.runnerProperty.scheduler
 
-        embeddings, tr_input = self.model(
+        embeddings, embeddings_drop, tr_input = self.model(
             data[: self.runnerProperty.len_train - 1], epoch=epoch, is_train=True
         )
 
@@ -33,6 +33,7 @@ class TrainerOurs(TrainerAndTester):
 
         for t in range(train_len):
             z = embeddings[t]
+            z_drop = embeddings_drop[t]
             pos_edge_index = self.prepare(t + 1)[0]
             neg_edge_index = negative_sampling_(
                 pos=pos_edge_index,
@@ -49,7 +50,8 @@ class TrainerOurs(TrainerAndTester):
             edge_label = torch.cat([pos_y, neg_y], dim=0)
 
             cy = self.model.cs_decoder(z, edge_index)
-            loss = criterion(cy, edge_label)
+            sy = self.model.cs_decoder(z_drop, edge_index)
+            loss = criterion(cy, edge_label) + self.var_loss(cy, sy, 10, edge_label)
             loss_list.append(loss.unsqueeze(0))
 
         ortho_loss = 0
@@ -80,3 +82,21 @@ class TrainerOurs(TrainerAndTester):
         )
 
         return average_epoch_loss, [], [], []
+
+    def var_loss(self, cy, sy, intervention_times, edge_label):
+        # faster approximate version of spatial-temporal
+        select = torch.randperm(len(sy))[:intervention_times].to(sy.device)
+        alls = torch.sigmoid(sy).detach()[select].unsqueeze(-1)  # [I,1]
+        allc = cy.expand(intervention_times, cy.shape[0])  # [I,E]
+        conf = allc * alls
+        alle = edge_label.expand(intervention_times, edge_label.shape[0])
+        crit = torch.nn.BCELoss(reduction="none")
+        env_loss = crit(conf.flatten(), alle.flatten())
+        env_loss = env_loss.view(intervention_times, sy.shape[0]).mean(dim=-1)
+        env_mean = env_loss.mean()
+        env_var = torch.var(env_loss * intervention_times)
+        # env_mean 은 왜 0이 되어야 하는가? cy 가 sy 로 인해 purturb 되어도 loss 가 0이도록
+        # env_var 는 왜 0이 되어야 하는가? cy 가 sy 로 인해 purturb 되었을 때, 서로 간 차이가 없도록
+        penalty = env_mean + env_var
+
+        return penalty
