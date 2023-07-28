@@ -42,7 +42,8 @@ class CustomMultiheadAttention(MultiheadAttention):
         )
 
         self.args = args
-        self.drop_path = DropPath(0.1, dim=0)
+        self.drop_path0d = DropPath(0.5, dim=0)
+        self.drop_path2d = DropPath(0.5, dim=2)
         self.load_positional_encoding(disentangle_dim, 1000, args.device)
         self.step = 0
 
@@ -101,7 +102,9 @@ class CustomMultiheadAttention(MultiheadAttention):
         )
         self.log_encode(x)
         # attention map is [#timestamps, #timestamps]
-        x, attn = super().forward(x, x, x, attn_bias=None, customize=True)
+        x_drop0d = self.drop_path0d(x)
+        x_drop2d = self.drop_path2d(x)
+        x, attn = super().forward(x_drop0d, x_drop2d, x, attn_bias=None, customize=True)
         self.log_att(x)
         # [#timestamps, 1, embed_dim] -> [#timestamps(some elementes are dropped), 1, embed_dim]
         # x = self.drop_path(x)
