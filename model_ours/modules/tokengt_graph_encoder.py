@@ -328,7 +328,7 @@ class TokenGTGraphEncoder(nn.Module):
             )
 
             if self.args.propagate == "inneraug":
-                time_entirenodes_emdim = self.propagate_info(
+                x, time_entirenodes_emdim = self.propagate_info(
                     x,
                     padded_node_mask,
                     padded_edge_mask,
@@ -359,10 +359,10 @@ class TokenGTGraphEncoder(nn.Module):
         i,
     ):
         # x: [#tokens, #timestamps, embed dim] -> [#timestamps, #tokens, embed dim]
-        _, time_entirenodes_emdim = self.custom[i](
+        x, time_entirenodes_emdim = self.custom[i](
             x.transpose(0, 1),
             padded_node_mask,
             padded_edge_mask,
             time_entirenodes_emdim,
         )
-        return time_entirenodes_emdim
+        return x.transpose(0, 1), time_entirenodes_emdim

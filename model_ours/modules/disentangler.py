@@ -63,11 +63,8 @@ class Disentangler(nn.Module):
             )[1]
             # 1: sort 한 뒤의 indices
         ).sort(descending=True)[1]
-        baskets = [[] for _ in range(self.comp_len)]
-        # 각 basket 의 node 들의 activated 횟수가 비슷하게 되도록 배분
-        for i, node in enumerate(sorted_act_nodes):
-            baskets[i % self.comp_len].append(int(node))
-        baskets = [np.array(x) for x in baskets]
+        # 각 basket 의 node 들의 activated 횟수가 매우 상이하도록 배분
+        baskets = np.array_split(sorted_act_nodes, self.comp_len)
         max_len = np.array([len(x) for x in baskets]).max()
         self.stacked_indices = np.stack(
             [np.pad(x, (0, max_len - len(x))) for x in baskets]
