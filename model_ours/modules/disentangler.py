@@ -15,7 +15,7 @@ class Disentangler(nn.Module):
         self.comp_len = comp_len
         self.comp_dim = comp_dim
         self.encode_layer_norm = nn.LayerNorm(embed_dim)
-        self.encode_final_layer_norm = nn.LayerNorm(comp_len * comp_dim)
+        self.encode_final_layer_norm = nn.LayerNorm(comp_len * comp_dim * 2)
         self.decode_norm = nn.LayerNorm(comp_dim)
         self.scga = ScatterAndGather(args, embed_dim)
         self.node_comp_mlps = nn.ModuleList(
@@ -55,8 +55,8 @@ class Disentangler(nn.Module):
             nodes, self.args.batched_data, time_entirenodes_emdim, is_mlp=False
         )
 
-        # activated 횟수가 많은 node 순서대로 정렬 (unique 면서 sort 된 순서대로니 counts 의 index 가 node 번호와 같고, counts 를 다시 sort 했으니, 많은 순서대로 정렬한 것)
         if self.training:
+            # activated 횟수가 많은 node 순서대로 정렬 (unique 면서 sort 된 순서대로니 counts 의 index 가 node 번호와 같고, counts 를 다시 sort 했으니, 많은 순서대로 정렬한 것)
             sorted_act_nodes = (
                 torch.cat(self.args.batched_data["indices_subnodes"]).unique(
                     return_counts=True
@@ -64,14 +64,23 @@ class Disentangler(nn.Module):
                 )[1]
                 # 1: sort 한 뒤의 indices
             ).sort(descending=True)[1]
-            # 각 basket 의 node 들의 activated 횟수가 비슷하게 되도록 배분
             baskets = [[] for _ in range(self.comp_len)]
+            # 각 basket 의 node 들의 activated 횟수가 유사하도록 배분
             for i, node in enumerate(sorted_act_nodes):
                 baskets[i % self.comp_len].append(int(node))
             baskets = [np.array(x) for x in baskets]
             max_len = np.array([len(x) for x in baskets]).max()
-            self.stacked_indices = np.stack(
+            stacked_indices1 = np.stack(
                 [np.pad(x, (0, max_len - len(x))) for x in baskets]
+            )
+            # 각 basket 의 node 들의 activated 횟수가 매우 상이하도록 배분
+            baskets = np.array_split(sorted_act_nodes, self.comp_len)
+            max_len = np.array([len(x) for x in baskets]).max()
+            stacked_indices2 = np.stack(
+                [np.pad(x, (0, max_len - len(x))) for x in baskets]
+            )
+            self.stacked_indices = np.concatenate(
+                [stacked_indices1, stacked_indices2], axis=0
             )
 
         pooled = self.node_comp_mlps[0](time_entirenodes_emdim)
@@ -93,10 +102,15 @@ class Disentangler(nn.Module):
         time_entirenodes_emdim = torch.zeros(
             x.shape[0], self.args.num_nodes, self.comp_dim, device=x.device
         )
+        # 중복된 index 에 넣으면 덮어씌워지므로, 중복된 index 가 없도록 앞 30개 뒤 30개 나눠서 + 로 넣음
+        x_reshape = x.reshape(x.shape[0], -1, 1, self.comp_dim)
+        time_entirenodes_emdim[
+            :, self.stacked_indices[: self.stacked_indices.shape[0] // 2], :
+        ] += x_reshape[:, : self.stacked_indices.shape[0] // 2, :, :]
+        time_entirenodes_emdim[
+            :, self.stacked_indices[self.stacked_indices.shape[0] // 2 :], :
+        ] += x_reshape[:, self.stacked_indices.shape[0] // 2 :, :, :]
         # reshape and indexing at once
-        time_entirenodes_emdim[:, self.stacked_indices, :] = x.reshape(
-            x.shape[0], -1, 1, self.comp_dim
-        )
         time_entirenodes_emdim = self.node_decomp_mlps(
             self.decode_norm(time_entirenodes_emdim)
         )
