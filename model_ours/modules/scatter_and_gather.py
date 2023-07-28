@@ -53,20 +53,24 @@ class ScatterAndGather(nn.Module):
             ta_mean += ta.abs().mean()
             bd_mean += bd.abs().mean()
 
-            input_ = ta + bd
+            if entire_features is not None:
+                input_ = ta + entire_features[t]
+            else:
+                input_ = ta + bd
+
             t_embedding = self.mlp_d(self.layer_norm_d(input_)) if is_mlp else input_
 
             t_entire_embeddings.append(t_embedding)
 
         ret = torch.stack(t_entire_embeddings, dim=0)
-        if entire_features is not None:
-            ret = ret + entire_features
-            logger.info(
-                f"ret: {ret.abs().mean():.2f} entire_features: {entire_features.abs().mean():.2f} ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
-            )
-        else:
-            pass
-            # logger.info("entire_features is None")
+        # if entire_features is not None:
+        #    ret = ret + entire_features
+        #    logger.info(
+        #        f"ret: {ret.abs().mean():.2f} entire_features: {entire_features.abs().mean():.2f} ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
+        #    )
+        # else:
+        #    pass
+        #    # logger.info("entire_features is None")
         return ret
 
     def _from_entire(self, x, batched_data):

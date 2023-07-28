@@ -22,14 +22,14 @@ class CustomMultiheadAttention(MultiheadAttention):
         dropout,
     ):
         # nodes 를 몇 개로 나눌 것인가
-        comp_len = 2
+        comp_len = 30
         # 나누어진 각각의 node basket 에 대해 몇개 씩의 feature 를 추출할 것인가
-        comp_dim = 16
-        disentangle_dim = comp_dim * comp_len * (args.len_train - 1)
+        comp_dim = 4
+        disentangle_dim = comp_dim * comp_len
         super().__init__(
             disentangle_dim,
             # 각 head 는 하나의 comp_dim 에 대해 attention 을 수행함
-            comp_len * (args.len_train - 1),
+            comp_len,
             attention_dropout=attention_dropout,
             self_attention=True,
         )
@@ -106,7 +106,6 @@ class CustomMultiheadAttention(MultiheadAttention):
         # [#timestamps, 1, embed_dim] -> [#timestamps(some elementes are dropped), 1, embed_dim]
         # x = self.drop_path(x)
         # [#timestamps, 1, embed_dim] -> [#timestamps, #tokens, embed_dim]
-        # self.log_output(residual)
         return residual, self.disentangler.decode(x, padded_node_mask, padded_edge_mask)
 
     def load_positional_encoding(self, dim_feature=1, max_position=1000, device="cpu"):
