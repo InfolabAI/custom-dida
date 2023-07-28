@@ -22,7 +22,7 @@ class CustomMultiheadAttention(MultiheadAttention):
         dropout,
     ):
         # nodes 를 몇 개로 나눌 것인가
-        comp_len = 300
+        comp_len = 30
         # 나누어진 각각의 node basket 에 대해 몇개 씩의 feature 를 추출할 것인가
         comp_dim = 4
         disentangle_dim = comp_dim * comp_len
@@ -103,8 +103,8 @@ class CustomMultiheadAttention(MultiheadAttention):
         self.log_encode(x)
         # attention map is [#timestamps, #timestamps]
         x_drop0d = self.drop_path0d(x)
-        x_drop2d = self.drop_path2d(x)
-        x, attn = super().forward(x_drop0d, x_drop2d, x, attn_bias=None, customize=True)
+        # x_drop2d = self.drop_path2d(x)
+        x, attn = super().forward(x_drop0d, x, x, attn_bias=None, customize=True)
         self.log_att(x)
         # [#timestamps, 1, embed_dim] -> [#timestamps(some elementes are dropped), 1, embed_dim]
         # x = self.drop_path(x)
