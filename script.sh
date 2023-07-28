@@ -1,43 +1,71 @@
-# 3.1G
-python main.py --model ours --seed 117 --device_id 0 --propagate no --dataset yelp --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 3.1G
-python main.py --model ours --seed 117 --device_id 1 --propagate no --dataset collab --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 4.3G
-python main.py --model ours --seed 117 --device_id 2 --propagate no --dataset bitcoin --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 6G
-python main.py --model ours --seed 117 --device_id 3 --propagate no --dataset wikielec --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 12.6G
-python main.py --model ours --seed 117 --device_id 4 --propagate no --dataset redditbody --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
+maximum_gpu_number=7
+gpu=0
+one=1
+do_experiment(){
+    python main.py --model ours --time_att_0d_dropout $d0 --time_att_2d_dropout $d2 --handling_time_att $hatt --seed $seed --device_id $gpu --propagate $propagate --dataset $dataset --ex_name "$ex_name" &
+    if [ $gpu == $maximum_gpu_number ]; then gpu=0; else let gpu=$gpu+$one; fi
+}
+do_ex_seeds(){
+    seed=117
+    do_experiment
+    seed=3690
+    do_experiment
+}
 
-# 3.1G
-python main.py --model ours --seed 3690 --device_id 0 --propagate no --dataset yelp --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 3.1G
-python main.py --model ours --seed 3690 --device_id 1 --propagate no --dataset collab --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 4.3G
-python main.py --model ours --seed 3690 --device_id 2 --propagate no --dataset bitcoin --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 6G
-python main.py --model ours --seed 3690 --device_id 3 --propagate no --dataset wikielec --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 12.6G
-python main.py --model ours --seed 3690 --device_id 5 --propagate no --dataset redditbody --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
+dataset=wikielec
+propagate=inneraug
+ex_name="Comparison of models with difference tdrops and att handling"
 
-# 3.1G
-python main.py --model ours --seed 117 --device_id 0 --propagate inneraug --dataset yelp --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 3.1G
-python main.py --model ours --seed 117 --device_id 1 --propagate inneraug --dataset collab --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 4.3G
-python main.py --model ours --seed 117 --device_id 2 --propagate inneraug --dataset bitcoin --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 6G
-python main.py --model ours --seed 117 --device_id 3 --propagate inneraug --dataset wikielec --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 12.6G
-python main.py --model ours --seed 117 --device_id 6 --propagate inneraug --dataset redditbody --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
+d0=0.1
+d2=0.1
+hatt="att_x_all"
+do_ex_seeds
+d0=0.5
+d2=0.5
+hatt="att_x_all"
+do_ex_seeds
+d0=0.0
+d2=0.5
+hatt="att_x_all"
+do_ex_seeds
+d0=0.5
+d2=0.0
+hatt="att_x_all"
+do_ex_seeds
 
-# 3.1G
-python main.py --model ours --seed 3690 --device_id 0 --propagate inneraug --dataset yelp --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 3.1G
-python main.py --model ours --seed 3690 --device_id 1 --propagate inneraug --dataset collab --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 4.3G
-python main.py --model ours --seed 3690 --device_id 2 --propagate inneraug --dataset bitcoin --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 6G
-python main.py --model ours --seed 3690 --device_id 3 --propagate inneraug --dataset wikielec --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
-# 12.6G
-python main.py --model ours --seed 3690 --device_id 7 --propagate inneraug --dataset redditbody --ex_name "Comparison between ours and normal tg on TiaRas neg edges" &
+d0=0.1
+d2=0.1
+hatt="att_x_last"
+do_ex_seeds
+d0=0.5
+d2=0.5
+hatt="att_x_last"
+do_ex_seeds
+d0=0.0
+d2=0.5
+hatt="att_x_last"
+do_ex_seeds
+d0=0.5
+d2=0.0
+hatt="att_x_last"
+do_ex_seeds
+
+d0=0.1
+d2=0.1
+hatt="att"
+do_ex_seeds
+d0=0.5
+d2=0.5
+hatt="att"
+do_ex_seeds
+d0=0.0
+d2=0.5
+hatt="att"
+do_ex_seeds
+d0=0.5
+d2=0.0
+hatt="att"
+do_ex_seeds
+
+# kill all python processes
+# lsof /dev/nvidia* | awk '{print $2}' | xargs -I {} kill {}

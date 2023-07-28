@@ -230,7 +230,9 @@ class OurModel(nn.Module):
         # [sum(activated_nodes) of all the timestamps, embed_dim]
         embeddings, t_entire_embeddings = self.main_model(tr_input, get_embedding=True)
 
-        # t_entire_embeddings = self.scatter_and_gather._to_entire(
-        #    embeddings, tr_input, entire_features=t_entier_embeddings
-        # )
+        if "att_x" in self.args.handling_time_att:
+            t_entire_embeddings = self.scatter_and_gather._to_entire(
+                embeddings, tr_input, entire_features=t_entire_embeddings
+            )
+            logger.debug("att_x")
         return t_entire_embeddings, tr_input

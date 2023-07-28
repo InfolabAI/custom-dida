@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from loguru import logger
 from .scatter_and_gather import ScatterAndGather
 
 
@@ -45,6 +46,7 @@ class Disentangler(nn.Module):
             [#timestamps, #tokens (node + edge), embed_dim]
         """
         x = self.encode_layer_norm(x)
+        self.num_tokens = x.shape[1]
         # [#timestamps, #tokens (activated nodes + edges), embed_dim] -> [#activated_nodes, embed_dim]
         compressed_x_list = []
         nodes = x[padded_node_mask, :]
@@ -86,8 +88,18 @@ class Disentangler(nn.Module):
         time_entirenodes_emdim = self.node_decomp_mlps(
             self.decode_norm(time_entirenodes_emdim)
         )
+        if self.args.handling_time_att == "att_x_all":
+            time_tokens_emdim = torch.zeros(
+                x.shape[0], self.num_tokens, self.embed_dim, device=x.device
+            )
+            time_tokens_emdim[padded_node_mask, :] = self.scga._from_entire(
+                time_entirenodes_emdim, self.args.batched_data
+            )
+            logger.debug("att_x_all")
+        else:
+            time_tokens_emdim = None
 
-        return time_entirenodes_emdim
+        return time_entirenodes_emdim, time_tokens_emdim
 
     def orthogonality_loss(self, *tensors):
         """

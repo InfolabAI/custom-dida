@@ -42,8 +42,8 @@ class CustomMultiheadAttention(MultiheadAttention):
         )
 
         self.args = args
-        self.drop_path0d = DropPath(0.5, dim=0)
-        self.drop_path2d = DropPath(0.5, dim=2)
+        self.drop_path0d = DropPath(self.args.time_att_0d_dropout, dim=0)
+        self.drop_path2d = DropPath(self.args.time_att_2d_dropout, dim=2)
         self.load_positional_encoding(disentangle_dim, 1000, args.device)
         self.step = 0
 
@@ -109,7 +109,8 @@ class CustomMultiheadAttention(MultiheadAttention):
         # [#timestamps, 1, embed_dim] -> [#timestamps(some elementes are dropped), 1, embed_dim]
         # x = self.drop_path(x)
         # [#timestamps, 1, embed_dim] -> [#timestamps, #tokens, embed_dim]
-        return residual, self.disentangler.decode(x, padded_node_mask, padded_edge_mask)
+        tee, ttke = self.disentangler.decode(x, padded_node_mask, padded_edge_mask)
+        return residual if ttke is None else residual + ttke, tee
 
     def load_positional_encoding(self, dim_feature=1, max_position=1000, device="cpu"):
         """

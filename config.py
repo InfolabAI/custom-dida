@@ -11,18 +11,17 @@ parser.add_argument("--encoder_ffn_embed_dim", type=int, default=32)
 # layer 는 memory 사용량에 embed_dim 보다는 큰 영향이 있음
 parser.add_argument("--encoder_layers", type=int, default=3)
 parser.add_argument("--encoder_attention_heads", type=int, default=16)
+parser.add_argument("--time_att_0d_dropout", type=float)
+parser.add_argument("--time_att_2d_dropout", type=float)
+parser.add_argument(
+    "--handling_time_att", type=str, help="att | att_x_last | att_x_all"
+)
 
 
 # dataset
 parser.add_argument("--dataset", type=str, default="collab", help="datasets")
 parser.add_argument("--num_nodes", type=int, default=-1, help="num of nodes")
 parser.add_argument("--nfeat", type=int, default=128, help="dim of input feature")
-parser.add_argument(
-    "--minnum_nodes_for_a_community",
-    type=int,
-    default=0,
-    help="This value is pre-fixed according to the dataset",
-)
 
 # plot
 parser.add_argument(
@@ -43,11 +42,6 @@ parser.add_argument(
     type=str,
     default="no",
     help="inneraug | dyaug | no",
-)
-parser.add_argument(
-    "--alpha_std",
-    type=int,
-    default=1,
 )
 
 
@@ -109,22 +103,6 @@ if int(args.device_id) >= 0 and torch.cuda.is_available():
 else:
     args.device = torch.device("cpu")
     logger.info("using cpu to train the model")
-
-# For ours
-if args.dataset == "collab":
-    args.minnum_nodes_for_a_community = 1000
-elif args.dataset == "yelp":
-    args.minnum_nodes_for_a_community = 2000
-elif args.dataset == "redditbody":
-    args.minnum_nodes_for_a_community = 5000
-elif args.dataset == "wikielec":
-    args.minnum_nodes_for_a_community = 2000
-elif args.dataset == "bitcoin":
-    args.minnum_nodes_for_a_community = 1000
-else:
-    raise NotImplementedError
-
-logger.info("minnum_nodes_for_a_community:{}".format(args.minnum_nodes_for_a_community))
 
 if args.model == "gcrn":
     setargs(args, {"lr": 0.001, "weight_decay": 5e-9})

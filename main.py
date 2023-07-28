@@ -23,7 +23,7 @@ logger.debug("DUBUG Start")
 
 
 # prepare log path
-args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.minnum_nodes_for_a_community}_{args.propagate}_{args.alpha_std}_"
+args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.model}_{args.dataset}_{args.propagate}_{args.time_att_0d_dropout}_{args.time_att_2d_dropout}_{args.handling_time_att}"
 
 # load data
 args, data = load_data(args)

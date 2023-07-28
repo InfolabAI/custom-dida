@@ -48,8 +48,8 @@
 - Run the project
     - **Option 1** - Use `main.py` directly, for example:
         ```bash
-        # Our method with edge propagation with alpha_std
-        python main.py --model ours --seed 123 --device_id 0 --propagate dyaug --alpha_std 1 --dataset collab --ex_name "Dynamic aug"
+        # Our method with node propagation 
+        python main.py --model ours --seed 123 --device_id 0 --propagate inneraug --dataset collab --ex_name "aa"
 
         # DIDA
         python main.py --model dida --seed 123 --device_id 0 --dataset collab --ex_name "Dynamic aug"
