@@ -11,10 +11,10 @@ parser.add_argument("--encoder_ffn_embed_dim", type=int, default=32)
 # layer 는 memory 사용량에 embed_dim 보다는 큰 영향이 있음
 parser.add_argument("--encoder_layers", type=int, default=3)
 parser.add_argument("--encoder_attention_heads", type=int, default=16)
-parser.add_argument("--time_att_0d_dropout", type=float)
-parser.add_argument("--time_att_2d_dropout", type=float)
+parser.add_argument("--time_att_0d_dropout", type=float, default=0.5)
+parser.add_argument("--time_att_2d_dropout", type=float, default=0.5)
 parser.add_argument(
-    "--handling_time_att", type=str, help="att | att_x_last | att_x_all"
+    "--handling_time_att", type=str, default="att", help="att | att_x_last | att_x_all"
 )
 
 

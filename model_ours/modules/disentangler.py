@@ -58,16 +58,18 @@ class Disentangler(nn.Module):
         # shuffle 하면 test AUC 0.6 이 한계, shuffle 안하면 0.7 가능
         # if self.training
         #    np.random.shuffle(entire_indices)
-        self.indices_history = np.array_split(entire_indices, self.comp_len)
-        for i, indices in enumerate(self.indices_history):
-            compressed_x_list.append(
-                self.node_comp_mlps[i](time_entirenodes_emdim[:, indices, :]).sum(
-                    1, keepdim=True
-                )
-                / len(indices)
-            )
-        compressed_x = self.encode_final_layer_norm(torch.cat(compressed_x_list, dim=2))
-        self.ortho_loss = self.orthogonality_loss(*compressed_x_list)
+        indices_history = np.array_split(entire_indices, self.comp_len)
+        max_len = np.array([len(x) for x in indices_history]).max()
+        self.stacked_indices = np.stack(
+            [np.pad(x, (0, max_len - len(x))) for x in indices_history]
+        )
+
+        pooled = self.node_comp_mlps[0](time_entirenodes_emdim)
+        pooled = (
+            pooled[:, self.stacked_indices, :].sum(2) / self.stacked_indices.shape[1]
+        ).reshape(pooled.shape[0], 1, -1)
+        compressed_x = self.encode_final_layer_norm(pooled)
+        # self.ortho_loss = self.orthogonality_loss(*compressed_x_list)
 
         return compressed_x
 
@@ -81,10 +83,10 @@ class Disentangler(nn.Module):
         time_entirenodes_emdim = torch.zeros(
             x.shape[0], self.args.num_nodes, self.comp_dim, device=x.device
         )
-        for indices, tensor in zip(
-            self.indices_history, torch.split(x, self.comp_dim, dim=2)
-        ):
-            time_entirenodes_emdim[:, indices, :] += tensor
+        # reshape and indexing at once
+        time_entirenodes_emdim[:, self.stacked_indices, :] = x.reshape(
+            x.shape[0], -1, 1, self.comp_dim
+        )
         time_entirenodes_emdim = self.node_decomp_mlps(
             self.decode_norm(time_entirenodes_emdim)
         )

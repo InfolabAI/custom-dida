@@ -22,7 +22,7 @@ class CustomMultiheadAttention(MultiheadAttention):
         dropout,
     ):
         # nodes 를 몇 개로 나눌 것인가
-        comp_len = 30
+        comp_len = 300
         # 나누어진 각각의 node basket 에 대해 몇개 씩의 feature 를 추출할 것인가
         comp_dim = 4
         disentangle_dim = comp_dim * comp_len
