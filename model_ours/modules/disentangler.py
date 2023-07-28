@@ -56,19 +56,23 @@ class Disentangler(nn.Module):
         )
 
         # activated 횟수가 많은 node 순서대로 정렬 (unique 면서 sort 된 순서대로니 counts 의 index 가 node 번호와 같고, counts 를 다시 sort 했으니, 많은 순서대로 정렬한 것)
-        sorted_act_nodes = (
-            torch.cat(self.args.batched_data["indices_subnodes"]).unique(
-                return_counts=True
-                # 1: counts
-            )[1]
-            # 1: sort 한 뒤의 indices
-        ).sort(descending=True)[1]
-        # 각 basket 의 node 들의 activated 횟수가 매우 상이하도록 배분
-        baskets = np.array_split(sorted_act_nodes, self.comp_len)
-        max_len = np.array([len(x) for x in baskets]).max()
-        self.stacked_indices = np.stack(
-            [np.pad(x, (0, max_len - len(x))) for x in baskets]
-        )
+        if self.training:
+            sorted_act_nodes = (
+                torch.cat(self.args.batched_data["indices_subnodes"]).unique(
+                    return_counts=True
+                    # 1: counts
+                )[1]
+                # 1: sort 한 뒤의 indices
+            ).sort(descending=True)[1]
+            # 각 basket 의 node 들의 activated 횟수가 비슷하게 되도록 배분
+            baskets = [[] for _ in range(self.comp_len)]
+            for i, node in enumerate(sorted_act_nodes):
+                baskets[i % self.comp_len].append(int(node))
+            baskets = [np.array(x) for x in baskets]
+            max_len = np.array([len(x) for x in baskets]).max()
+            self.stacked_indices = np.stack(
+                [np.pad(x, (0, max_len - len(x))) for x in baskets]
+            )
 
         pooled = self.node_comp_mlps[0](time_entirenodes_emdim)
         pooled = (
