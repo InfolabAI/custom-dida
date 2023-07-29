@@ -37,11 +37,13 @@ class GraphFeatureTokenizer(nn.Module):
         self.orf_encoder = nn.Linear(2 * hidden_dim, hidden_dim, bias=False)
         # from orf.py
         q, r = torch.linalg.qr(
-            torch.randn((1, args.num_nodes, hidden_dim), device=args.device),
+            torch.randn((10, args.num_nodes, hidden_dim), device=args.device),
             mode="reduced",
         )
         # [1, num_entire_nodes, hidden_dim] -> [num_entire_nodes, hidden_dim]
-        self.orf = torch.nn.functional.normalize(q, p=2, dim=2).squeeze(0)
+        self.orf = torch.nn.functional.normalize(q, p=2, dim=2)
+
+        self.step = 0
 
     @staticmethod
     def get_batch(
@@ -157,17 +159,6 @@ class GraphFeatureTokenizer(nn.Module):
         return eigvec
 
     @staticmethod
-    @torch.no_grad()
-    def get_orf_batched(node_mask, dim, device, dtype):
-        b, max_n = node_mask.size(0), node_mask.size(1)
-        orf = gaussian_orthogonal_random_matrix_batched(
-            b, dim, dim, device=device, dtype=dtype
-        )  # [B, D, D]
-        orf = orf[:, None, ...].expand(b, max_n, dim, dim)  # [B, max(n_node), D, D]
-        orf = orf[node_mask]  # [sum(n_node), D, D]
-        return orf
-
-    @staticmethod
     def get_index_embed(node_id, node_mask, padded_index):
         """
         :param node_id: Tensor([sum(node_num), D])
@@ -222,6 +213,7 @@ class GraphFeatureTokenizer(nn.Module):
         dtype = node_feature.dtype
 
         (
+            # padded_index: source node index 와 target node index 를 가짐(서로 같으면 node, 다르면 edge)
             padded_index,
             padded_feature,
             padding_mask,
@@ -237,11 +229,14 @@ class GraphFeatureTokenizer(nn.Module):
         # apply orf id
         orf_id_list = []
         for id_tensor in indices_subnodes:
-            orf_id_list.append(self.orf[id_tensor])
+            orf_id_list.append(self.orf[self.step % 10][id_tensor])
+
+        self.step += 1
 
         # [sum(#nodes), embed_dim]
         orf_node_id = torch.concat(orf_id_list, dim=0)
         # [sum(#nodes), embed_dim] -> [#subgraphs, max(#nodes), 2*embed_dim]
+        # pad 부분에도 orf 가 있으나 무의미하게 반복됨
         orf_embed = self.get_index_embed(orf_node_id, node_mask, padded_index)
         # [#subgraphs, max(#nodes), 2*embed_dim] -> [#subgraphs, max(#nodes), embed_dim]
         padded_feature = padded_feature + self.orf_encoder(orf_embed)
@@ -249,6 +244,7 @@ class GraphFeatureTokenizer(nn.Module):
         # apply type id
         padded_feature = padded_feature + self.get_type_embed(padded_index)
 
+        # pad 에 대해 0으로 만드는 부분
         padded_feature = padded_feature.masked_fill(padding_mask[..., None], float("0"))
 
         return (

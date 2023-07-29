@@ -15,24 +15,6 @@ class TrainerAndTester:
         self.model = model
         self.data_to_prepare = data_to_prepare
 
-    def preprocess_data_per_run(self, data):
-        self.cgt = ConvertGraphTypes()
-        if (
-            self.args.model == "ours"
-            or self.args.model == "gcn"
-            or self.args.model == "evolvegcn"
-            or self.args.model == "gcrn"
-        ):
-            data = self.cgt.dict_to_list_of_dglG(data, self.args.device)
-        elif self.args.model == "dida":
-            data = data["train"]
-        elif self.args.model == "dyformer":
-            data = self.cgt.dict_to_list_of_networkxG(data)
-        else:
-            raise NotImplementedError(f"args.model: {self.args.model}")
-
-        return data
-
     def preprocess_data_per_epoch(self, data):
         pass
 

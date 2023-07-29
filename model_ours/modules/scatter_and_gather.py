@@ -29,12 +29,20 @@ class ScatterAndGather(nn.Module):
         )
         self.step = 0
 
-    def _to_entire(self, x, batched_data, entire_features=None, is_mlp=True):
+    def _to_entire(
+        self,
+        x,
+        total_node_num,
+        total_indices_subnodes,
+        original_x,
+        entire_features=None,
+        is_mlp=True,
+    ):
         offset = 0
         t_entire_embeddings = []
         ta_mean, bd_mean = 0, 0
         for t, (node_num, activated_indices) in enumerate(
-            zip(batched_data["node_num"], batched_data["indices_subnodes"])
+            zip(total_node_num, total_indices_subnodes)
         ):
             # t_activated_embedding.size == [#nodes at t, embed_dim]
             t_activated_embedding = scatter(
@@ -48,7 +56,7 @@ class ScatterAndGather(nn.Module):
             offset += node_num
 
             ta = t_activated_embedding
-            bd = batched_data["x"]
+            bd = original_x
 
             ta_mean += ta.abs().mean()
             bd_mean += bd.abs().mean()

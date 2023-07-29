@@ -36,12 +36,7 @@ class RunnerProperty:
 
 
 def set_optimizer(args, model):
-    if (
-        args.model == "dida"
-        or args.model == "gcn"
-        or args.model == "evolvegcn"
-        or args.model == "gcrn"
-    ):
+    if args.model == "dida":
         optimizer = optim.Adam(
             [p for n, p in model.named_parameters() if "ss" not in n],
             lr=args.lr,
@@ -49,35 +44,21 @@ def set_optimizer(args, model):
         )
         return (optimizer,), (None,)
     elif args.model == "ours":
-        # graph attention model
-        optimizer0 = optim.Adam(
-            [p for n, p in model.named_parameters() if n.startswith("attention")],
-            lr=args.lr_tg,
-            weight_decay=0,
-        )
-        scheduler0 = PolynomialDecayLR(
-            optimizer0,
-            warmup_updates=args.warmup_updates,
-            tot_updates=args.total_num_update,
-            lr=args.lr_tg,
-            end_lr=args.end_learning_rate,
-            power=args.power,
-        )
         # main model
-        optimizer1 = optim.Adam(
-            [p for n, p in model.named_parameters() if not n.startswith("attention")],
+        optimizer = optim.Adam(
+            [p for n, p in model.named_parameters()],
             lr=args.lr_tg,
             weight_decay=args.weight_decay_tg,
         )
-        scheduler1 = PolynomialDecayLR(
-            optimizer1,
+        scheduler = PolynomialDecayLR(
+            optimizer,
             warmup_updates=args.warmup_updates,
             tot_updates=args.total_num_update,
             lr=args.lr_tg,
             end_lr=args.end_learning_rate,
             power=args.power,
         )
-        return (optimizer0, optimizer1), (scheduler0, scheduler1)
+        return (optimizer,), (scheduler,)
     elif args.model == "dyformer":
         # DyFormer uses own optimizer and scheduler
         return None, None
@@ -119,12 +100,10 @@ class Runner(object):
             "total length: {}, test length: {}".format(self.len, args.testlength)
         )
 
-    def run(self):
+    def run(self, data):
         args = self.args
         self.conf_opt = None
 
-        # complete checking shuffled data and not shuffled ori_data
-        data = self.model.trainer.preprocess_data_per_run(self.data)
         if self.args.model == "dyformer":
             # DyFormer uses own training code and test code. So self.model.trainer.train() process all the epochs for all the timestamps.
             self.model.trainer.train(data)

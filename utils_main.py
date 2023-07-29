@@ -9,6 +9,26 @@ from loguru import logger
 from datetime import datetime
 from dataset_loader.utils_data import negative_sampling as tiara_negative_sampling
 from torch_geometric.utils import negative_sampling
+from convert_graph_types import ConvertGraphTypes
+
+
+def preprocess_data_per_run(args, data):
+    cgt = ConvertGraphTypes()
+    if (
+        args.model == "ours"
+        or args.model == "gcn"
+        or args.model == "evolvegcn"
+        or args.model == "gcrn"
+    ):
+        data = cgt.dict_to_list_of_dglG(data, args.device)
+    elif args.model == "dida":
+        data = data["train"]
+    elif args.model == "dyformer":
+        data = cgt.dict_to_list_of_networkxG(data)
+    else:
+        raise NotImplementedError(f"args.model: {args.model}")
+
+    return data
 
 
 def negative_sampling_(**args):

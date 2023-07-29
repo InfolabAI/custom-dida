@@ -157,7 +157,18 @@ class ConvertGraphTypes:
 
         return list_of_dgl_graphs
 
-    def dglG_list_to_TrInputDict(self, list_of_dgl_graphs):
+    def dglG_list_to_pool(self, list_of_dgl_graphs):
+        comm = self._get_activated_communities(list_of_dgl_graphs)
+        new_node_indices = np.unique(
+            np.concatenate([activated_nodes for t, activated_nodes in comm.items()])
+        )
+        tr_input_pool = defaultdict(list)
+        tr_input_pool["indices_subnodes"] = torch.Tensor(new_node_indices).int()
+        subgraph = dgl.node_subgraph(list_of_dgl_graphs[0], new_node_indices)
+        tr_input_pool["node_data"] = subgraph.ndata["w"]
+        return tr_input_pool
+
+    def dglG_list_to_TrInputDict(self, list_of_dgl_graphs, build_edge=True):
         comm = self._get_activated_communities(list_of_dgl_graphs)
         tr_input = defaultdict(list)
         node_data_index = 0
@@ -170,49 +181,53 @@ class ConvertGraphTypes:
 
         for subgraph in subgraph_list:
             tr_input["node_data"].append(subgraph.ndata["w"])
-            tr_input["edge_data"].append(subgraph.edata["w"])
-            edge_tensor = torch.concat(
-                [subgraph.edges()[0].unsqueeze(0), subgraph.edges()[1].unsqueeze(0)]
+            # node i, j 의 feature 를 연산하여 edge feature 로 사용
+            tr_input["edge_data"].append(
+                subgraph.ndata["w"][subgraph.edges()[0]]
+                * subgraph.ndata["w"][subgraph.edges()[1]]
+                if build_edge
+                else None
+            )
+            edge_tensor = (
+                torch.concat(
+                    [subgraph.edges()[0].unsqueeze(0), subgraph.edges()[1].unsqueeze(0)]
+                )
+                if build_edge
+                else None
             )
             tr_input["edge_index"].append(edge_tensor)
             tr_input["node_num"].append(subgraph.num_nodes())
-            tr_input["edge_num"].append(subgraph.num_edges())
+            tr_input["edge_num"].append(subgraph.num_edges() if build_edge else None)
 
         tr_input["node_data"] = torch.concat(tr_input["node_data"])
-        tr_input["edge_data"] = torch.concat(tr_input["edge_data"])
-        tr_input["edge_index"] = torch.concat(tr_input["edge_index"], dim=1)
+        tr_input["edge_data"] = (
+            torch.concat(tr_input["edge_data"]) if build_edge else None
+        )
+        tr_input["edge_index"] = (
+            torch.concat(tr_input["edge_index"], dim=1) if build_edge else None
+        )
         tr_input["x"] = list_of_dgl_graphs[0].ndata["w"]
 
         return tr_input
 
-    def weighted_adjacency_to_graph(self, adj, node_features, edge_number_limitation):
+    def weighted_adjacency_to_graph(self, adj, node_features):
         """
         Parameters
         --------
         node_features: torch.tensor [#nodes, hidden_dim]
-        edge_number_limitation: int: If edge_number_limitation is 100, then we will remian only 100 edges with high weights.
         """
         adj = adj.coalesce()
         indices = adj.indices()
-        # edge 가중치가 큰 순서대로 edge_number_limitation 개수만큼만 남기기 위해 삭제할 indices 선택
-        indices_to_be_removed = adj.values().sort(descending=True)[1][
-            int(edge_number_limitation) :
-        ]
-        # 0 value 인 edge 도 모두 제거하도록 indices 추가
-        indices_to_be_removed = torch.concat(
-            [indices_to_be_removed, torch.where(adj.values() == 0)[0]]
-        )
+        # 0 value 인 edge 모두 제거하도록 indices 추출
+        indices_to_be_removed = torch.where(adj.values() == 0)[0]
 
         graph = dgl.graph(
             (indices[0, :], indices[1, :]), num_nodes=node_features.shape[0]
         )
         graph.ndata["w"] = node_features
-        # [#edges] -> [#edges, hidden_dim]
-        graph.edata["w"] = adj.values().broadcast_to(node_features.shape[1], -1).t()
 
         graph = graph.remove_self_loop()
         graph.remove_edges(indices_to_be_removed)
-        # we do not use removing parallel edges like [i,j] and [j,i] because it may remove the gradient
         # graph = dgl.to_simple(graph)
 
         return graph

@@ -29,10 +29,12 @@ args.log_dir = f"{args.log_dir}/{args.ex_name}/{get_current_datetime()}_{args.mo
 args, data = load_data(args)
 # loss 계산 또는 auc 계산을 위한 원본 데이터 (edges), 즉, not augmented edges
 data_to_prepare = copy.deepcopy(data["train"])
+# complete checking shuffled data and not shuffled ori_data
+data_for_each_model = preprocess_data_per_run(args, data)
 
 # select model
 if args.model == "ours":
-    model = OurModel(args, data_to_prepare, data["x"].shape[0]).to(args.device)
+    model = OurModel(args, data_to_prepare, data_for_each_model).to(args.device)
     args = model.args
 elif args.model == "dida":
     model = DGNN(args, data_to_prepare).to(args.device)
@@ -75,4 +77,4 @@ runner = Runner(
     data,
     writer=writer,
 )
-runner.run()
+runner.run(data_for_each_model)

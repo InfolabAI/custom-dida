@@ -63,11 +63,9 @@ class TrainerOurs(TrainerAndTester):
         # )
 
         optimizer[0].zero_grad()
-        optimizer[1].zero_grad()
         loss_total.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip_norm)
         scheduler[0].step()
-        scheduler[1].step()
         if self.args.loguru_level == "DEBUG" and (epoch % 50 == 0 or epoch == 1):
             for name, param in self.model.named_parameters():
                 # self.runnerProperty.writer.add_histogram( name, param, self.args.total_step)

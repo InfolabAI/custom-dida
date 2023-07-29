@@ -39,7 +39,15 @@ class Disentangler(nn.Module):
         # )
         self.ortho_loss = torch.zeros(1).squeeze(0).float().to(args.device)
 
-    def encode(self, x, padded_node_mask, padded_edge_mask, time_entirenodes_emdim):
+    def encode(
+        self,
+        x,
+        padded_node_mask,
+        indices_subnodes,
+        node_num,
+        padded_edge_mask,
+        time_entirenodes_emdim,
+    ):
         """
         Parameters
         ----------
@@ -52,13 +60,20 @@ class Disentangler(nn.Module):
         compressed_x_list = []
         nodes = x[padded_node_mask, :]
         time_entirenodes_emdim = self.scga._to_entire(
-            nodes, self.args.batched_data, time_entirenodes_emdim, is_mlp=False
+            nodes,
+            node_num,
+            indices_subnodes,
+            self.args.batched_data["x"],
+            time_entirenodes_emdim,
+            is_mlp=False,
         )
+        if indices_subnodes is None:
+            indices_subnodes = self.args.batched_data["indices_subnodes"]
 
         if self.training:
             # activated 횟수가 많은 node 순서대로 정렬 (unique 면서 sort 된 순서대로니 counts 의 index 가 node 번호와 같고, counts 를 다시 sort 했으니, 많은 순서대로 정렬한 것)
             sorted_act_nodes = (
-                torch.cat(self.args.batched_data["indices_subnodes"]).unique(
+                torch.cat(indices_subnodes).unique(
                     return_counts=True
                     # 1: counts
                 )[1]

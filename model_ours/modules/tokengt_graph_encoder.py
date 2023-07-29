@@ -16,6 +16,7 @@ from .tokenizer import GraphFeatureTokenizer
 from .tokengt_graph_encoder_layer import TokenGTGraphEncoderLayer
 from loguru import logger
 from .custom_attention import CustomMultiheadAttention
+from .intervene_nodes import InterveneNodes
 
 
 def init_graphormer_params(module):
@@ -91,17 +92,12 @@ class TokenGTGraphEncoder(nn.Module):
                 CustomMultiheadAttention(
                     args,
                     embedding_dim,
-                    num_attention_heads,
                     attention_dropout,
-                    q_noise=q_noise,
-                    qn_block_size=qn_block_size,
-                    activation_fn=activation_fn,
-                    activation_dropout=activation_dropout,
-                    dropout=dropout,
                 )
                 for layer_idx in range(num_encoder_layers)
             ]
         )
+        self.intervene_nodes = InterveneNodes(args)
 
         self.graph_feature = GraphFeatureTokenizer(
             args=args,
@@ -317,7 +313,9 @@ class TokenGTGraphEncoder(nn.Module):
 
         st = time.time()
         attn_dict = {"maps": {}, "padded_index": padded_index}
-        time_entirenodes_emdim = None
+        tee = None
+        indices_subnodes = self.args.batched_data["indices_subnodes"]
+        node_num = self.args.batched_data["node_num"]
         for i in range(len(self.layers)):
             layer = self.layers[i]
             x, attn = layer(
@@ -327,14 +325,21 @@ class TokenGTGraphEncoder(nn.Module):
                 self_attn_bias=None,
             )
 
-            if self.args.propagate == "inneraug":
-                x, time_entirenodes_emdim = self.propagate_info(
+            if self.args.propagate == "intervene_node" and i == 0:
+                (
                     x,
+                    indices_subnodes,
                     padded_node_mask,
-                    padded_edge_mask,
-                    batched_data,
-                    time_entirenodes_emdim,
-                    i,
+                    node_num,
+                ) = self.intervene_nodes(x, padded_node_mask, padded_edge_mask)
+                logger.info(f"intervene_nodes: {node_num}")
+            elif self.args.propagate == "inneraug":
+                x, tee = self.custom[i](
+                    x=x,
+                    padded_node_mask=padded_node_mask,
+                    padded_edge_mask=padded_edge_mask,
+                    indices_subnodes=indices_subnodes,
+                    node_num=node_num,
                 )
             else:
                 pass
@@ -347,22 +352,4 @@ class TokenGTGraphEncoder(nn.Module):
         # x: T x B x C -> B x T x C -> (node_num) x C
         node_data = x.transpose(0, 1)[padded_node_mask, :]
         # logger.debug(f"ET [pure forward]: {time.time() - st:.5f}")
-        return node_data, time_entirenodes_emdim
-
-    def propagate_info(
-        self,
-        x,
-        padded_node_mask,
-        padded_edge_mask,
-        batched_data,
-        time_entirenodes_emdim,
-        i,
-    ):
-        # x: [#tokens, #timestamps, embed dim] -> [#timestamps, #tokens, embed dim]
-        x, time_entirenodes_emdim = self.custom[i](
-            x.transpose(0, 1),
-            padded_node_mask,
-            padded_edge_mask,
-            time_entirenodes_emdim,
-        )
-        return x.transpose(0, 1), time_entirenodes_emdim
+        return node_data, [tee, node_num, indices_subnodes]
