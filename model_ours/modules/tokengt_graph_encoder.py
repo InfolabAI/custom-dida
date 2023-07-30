@@ -317,6 +317,18 @@ class TokenGTGraphEncoder(nn.Module):
         indices_subnodes = self.args.batched_data["indices_subnodes"]
         node_num = self.args.batched_data["node_num"]
         for i in range(len(self.layers)):
+            if self.args.propagate == "intervene_node" and i == 0:
+                (
+                    x,
+                    indices_subnodes,
+                    padded_node_mask,
+                    padding_mask,
+                    node_num,
+                ) = self.intervene_nodes(
+                    x, padded_node_mask, padded_edge_mask, padding_mask
+                )
+                logger.info(f"intervene_node: {node_num}")
+
             layer = self.layers[i]
             x, attn = layer(
                 x,
@@ -324,16 +336,7 @@ class TokenGTGraphEncoder(nn.Module):
                 self_attn_mask=attn_mask,
                 self_attn_bias=None,
             )
-
-            if self.args.propagate == "intervene_node" and i == 0:
-                (
-                    x,
-                    indices_subnodes,
-                    padded_node_mask,
-                    node_num,
-                ) = self.intervene_nodes(x, padded_node_mask, padded_edge_mask)
-                logger.info(f"intervene_nodes: {node_num}")
-            elif self.args.propagate == "inneraug":
+            if self.args.propagate == "inneraug":
                 x, tee = self.custom[i](
                     x=x,
                     padded_node_mask=padded_node_mask,

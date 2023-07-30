@@ -40,7 +40,7 @@ class ScatterAndGather(nn.Module):
     ):
         offset = 0
         t_entire_embeddings = []
-        ta_mean, bd_mean = 0, 0
+        ta_nonzero, ta_mean, bd_mean = 0, 0, 0
         for t, (node_num, activated_indices) in enumerate(
             zip(total_node_num, total_indices_subnodes)
         ):
@@ -58,6 +58,7 @@ class ScatterAndGather(nn.Module):
             ta = t_activated_embedding
             bd = original_x
 
+            ta_nonzero += ta.mean(1).nonzero().size(0)
             ta_mean += ta.abs().mean()
             bd_mean += bd.abs().mean()
 
@@ -67,11 +68,14 @@ class ScatterAndGather(nn.Module):
 
             t_entire_embeddings.append(t_embedding)
 
+        logger.info(
+            f"ta_nonzero: {ta_nonzero}, ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
+        )
         ret = torch.stack(t_entire_embeddings, dim=0)
         if entire_features is not None:
             ret = ret + entire_features
             logger.info(
-                f"ret: {ret.abs().mean():.2f} entire_features: {entire_features.abs().mean():.2f} ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
+                f"ret: {ret.abs().mean():.2f} entire_features: {entire_features.abs().mean():.2f}"
             )
         # else:
         #    pass
