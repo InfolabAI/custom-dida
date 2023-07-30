@@ -11,7 +11,7 @@ from model_ours.modules.multihead_attention import MultiheadAttention
 
 # funtion for Pytorch's backpropagation hook
 def tensor_hook(grad):
-    logger.info(f"grad: {grad}")
+    logger.info(f"grad: {grad.abs().mean()}")
     return grad
 
 
@@ -55,11 +55,12 @@ class InterveneNodes(nn.Module):
             hard=False,
             dim=-1,
         )
-        # mask[mask < eps] = 0.0
         sampled_indices = mask.sort(descending=True)[1][:num_sample]
-        # sampled_indices = sampled_indices[mask[sampled_indices] > eps]
+        sampled_indices = sampled_indices[mask[sampled_indices] > eps]
 
-        # cat_num = ceil(num_sample / sampled_node_features.detach().shape[0])
+        # cat_num = ceil(num_sample / sampled_indices.detach().shape[0])
+        # repeat 과 다르게, repeat_interleave 는 element 의 순서를 유지하면서 반복함. e.g., [1, 2, 3] -> [1, 1, 2, 2, 3, 3]
+        # sampled_indices = sampled_indices.repeat_interleave(cat_num)[:num_sample]
 
         return mask, sampled_indices
 
@@ -82,22 +83,29 @@ class InterveneNodes(nn.Module):
             f"sample/{status}_sampled_indices", sampled_indices, self.args.total_step
         )
 
-        sampled_node_features = self.args.batched_data_pool["node_data"][
-            sampled_indices
-        ] * mask[sampled_indices].unsqueeze(1)
+        node_features = self.args.batched_data_pool["node_data"] * mask.unsqueeze(1)
+        sampled_node_features = node_features[sampled_indices]
 
         sampled_original_indices = self.args.batched_data_pool["indices_subnodes"][
             sampled_indices.cpu()
         ]
 
         ######################
+        ## set pad_mask to be fit to the number of sampled_indices
+        # pad_mask 는 True 시작점붙터 최대 sampled_indices 길이만큼만 True 이도록 설정함
+        # sampled_pad_mask 는 sampled_indices[t] 중에 pad_mask[t] 의 True 수보다 길이가 긴 것은 False 이도록 pad_mask 의 token 방향 가장 뒷부분을 이용함
+        sampled_pad_mask = pad_mask.clone()[:, -sampled_indices.shape[0] :]
+        # tokenizer 에서 모든 time 은 마지막에 최소한 1개의 pad 를 가지도록 max_len 을 조절했음
+        for t in range(pad_mask.shape[0]):
+            true_idx = pad_mask[t].nonzero()
+            pad_mask[t, true_idx[0] + sampled_indices.shape[0] :] = False
+
+        ######################
         ## intervene sampled node features to x
         sampled_node_features = sampled_node_features.unsqueeze(0).broadcast_to(
             x.shape[0], -1, -1
         )
-        x[pad_mask, :] = sampled_node_features[
-            pad_mask[:, pad_mask.shape[1] - num_sample :], :
-        ]
+        x[pad_mask, :] = sampled_node_features[sampled_pad_mask, :]
 
         ######################
         ## intervene sampled original indices to self.args.batched_data["indices_subnodes"]
@@ -111,15 +119,19 @@ class InterveneNodes(nn.Module):
         sids = torch.stack([sampled_original_indices for _ in range(x.shape[0])]).to(
             x.device
         )
-        nids[pad_mask] = sids[pad_mask[:, pad_mask.shape[1] - num_sample :]]
+        nids[pad_mask] = sids[sampled_pad_mask]
         new_indices_subnodes = []
         for t in range(nids.shape[0]):
             new_indices_subnodes.append(nids[t][nids[t] != -1])
 
         # 원래 pad 였던 부분이 node 가 되었으므로 True 로 변경
+        padded_node_mask = padded_node_mask.clone()
         padded_node_mask[pad_mask] = True
-        # Multi-head attention 에서 padding_mask 가 True 인 부분을 무시하는데, padding_mask 가 의미없으므로 None 으로 변경
-        padding_mask = None
+        # Multi-head attention 에서 padding_mask 가 True 인 부분을 무시하는데, 만약 pad 가 1개도 없으면, padding_mask 가 의미없으므로 None 으로 변경
+        padding_mask = padding_mask.clone()
+        padding_mask[pad_mask] = False
+        if padding_mask.sum() == 0:
+            padding_mask = None
         # time 별 node 의 수가 바뀌었으므로 변경
         new_node_num = [len(x) for x in new_indices_subnodes]
 
