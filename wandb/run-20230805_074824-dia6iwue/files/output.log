@@ -1,0 +1,77 @@
+[32m2023-08-05 07:48:32.268[39m | [1mINFO    [22m | [36mdataset_loader.template[39m:[36mload[39m:[36m137[39m - [1mTemporalGraph(WikiElec, num_nodes=7125, num_edges=212856, num_timesteps=100)
+
+epoch:   0%|▌                                                                                                               | 1/200 [00:02<08:05,  2.44s/it]
+train loss:  0.7015, train metric:  0.5176, val loss:  0.7370, val metric:  0.4292, test loss:  0.7370, test metric:  0.4390
+
+epoch:   1%|█                                                                                                               | 2/200 [00:03<06:13,  1.88s/it]
+
+epoch:   2%|██▏                                                                                                             | 4/200 [00:07<05:23,  1.65s/it]
+
+epoch:   2%|██▊                                                                                                             | 5/200 [00:08<05:08,  1.58s/it]
+
+epoch:   3%|███▎                                                                                                            | 6/200 [00:10<05:10,  1.60s/it]
+train loss:  0.7082, train metric:  0.5547, val loss:  0.6982, val metric:  0.4448, test loss:  0.6982, test metric:  0.4354
+
+epoch:   4%|███▉                                                                                                            | 7/200 [00:11<04:58,  1.54s/it]
+
+epoch:   4%|█████                                                                                                           | 9/200 [00:14<04:53,  1.54s/it]
+
+epoch:   5%|█████▌                                                                                                         | 10/200 [00:16<04:57,  1.56s/it]
+train loss:  0.6934, train metric:   0.608, val loss:  0.6947, val metric:  0.5000, test loss:  0.6947, test metric:  0.5000
+
+epoch:   6%|██████                                                                                                         | 11/200 [00:17<04:49,  1.53s/it]
+
+epoch:   6%|███████▏                                                                                                       | 13/200 [00:20<04:48,  1.54s/it]
+
+epoch:   7%|███████▊                                                                                                       | 14/200 [00:22<04:43,  1.52s/it]
+
+epoch:   8%|████████▎                                                                                                      | 15/200 [00:24<05:00,  1.62s/it]
+train loss:  0.6880, train metric:  0.5996, val loss:  0.6934, val metric:  0.4606, test loss:  0.6936, test metric:  0.4345
+
+epoch:   8%|████████▉                                                                                                      | 16/200 [00:25<05:03,  1.65s/it]
+
+epoch:   8%|█████████▍                                                                                                     | 17/200 [00:27<05:04,  1.66s/it]
+
+epoch:  10%|██████████▌                                                                                                    | 19/200 [00:30<04:47,  1.59s/it]
+
+epoch:  10%|███████████                                                                                                    | 20/200 [00:32<04:47,  1.60s/it]
+train loss:  0.6487, train metric:   0.658, val loss:  0.7533, val metric:  0.4793, test loss:  0.7614, test metric:  0.4405
+
+epoch:  11%|████████████▏                                                                                                  | 22/200 [00:35<04:31,  1.52s/it]
+
+epoch:  12%|████████████▊                                                                                                  | 23/200 [00:36<04:34,  1.55s/it]
+
+epoch:  12%|█████████████▎                                                                                                 | 24/200 [00:38<04:26,  1.52s/it]
+train loss:  0.6180, train metric:  0.6979, val loss:  0.6868, val metric:  0.5865, test loss:  0.6963, test metric:  0.5432
+
+epoch:  12%|█████████████▉                                                                                                 | 25/200 [00:39<04:30,  1.54s/it]
+
+epoch:  14%|██████████████▉                                                                                                | 27/200 [00:42<04:26,  1.54s/it]
+
+epoch:  14%|███████████████▌                                                                                               | 28/200 [00:44<04:20,  1.51s/it]
+train loss:  0.5915, train metric:    0.74, val loss:  0.6625, val metric:  0.6530, test loss:  0.6676, test metric:  0.6175
+epoch:  14%|████████████████                                                                                               | 29/200 [00:45<04:31,  1.59s/it]
+Traceback (most recent call last):
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/main.py", line 259, in <module>
+    Fire(main_wraper)
+  File "/compuworks/anaconda3/envs/py39_p2/lib/python3.9/site-packages/fire/core.py", line 141, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/compuworks/anaconda3/envs/py39_p2/lib/python3.9/site-packages/fire/core.py", line 475, in _Fire
+    component, remaining_args = _CallAndUpdateTrace(
+  File "/compuworks/anaconda3/envs/py39_p2/lib/python3.9/site-packages/fire/core.py", line 691, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/main.py", line 238, in main_wraper
+    test_metric, history = main(**setting)
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/main.py", line 207, in main
+    model, decoder, history = trainer.train(
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/trainer.py", line 86, in train
+    train_loss, train_metric = self.calc_loss_and_metrics("train", False)
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/trainer.py", line 164, in calc_loss_and_metrics
+    return self.link_prediction(split, evaluate)
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/trainer.py", line 207, in link_prediction
+    non_edges = [
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/trainer.py", line 208, in <listcomp>
+    negative_sampling(adj_list)
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/dataset_loader/utils.py", line 115, in negative_sampling
+    while len(neg_dests) < len(neighbors):
+KeyboardInterrupt

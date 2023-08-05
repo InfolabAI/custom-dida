@@ -1,50 +1,46 @@
 import os, json
 import torch
+import dataset_loader, module
+import wandb
 from fire import Fire
 from loguru import logger
 from utils import fix_seed
-import dataset_loader, module
 from dataset_loader.link import LinkDatasetTemplate
 from dataset_loader.node import NodeDatasetTemplate
 from trainer import Trainer
 from evaluator import AUCMetric, F1Metric
 import augmenter
 
+
 def main(
     # dataset and preprocessing parameters
-    dataset='BitcoinAlpha',
+    dataset="BitcoinAlpha",
     time_aggregation=1200000,
-
     # train / validataion / test ratio
     train_ratio=0.7,
     val_ratio=0.1,
-
     # augment method
-    augment_method='tiara',
+    augment_method="tiara",
     alpha=0.2,
     beta=0.3,
     eps=1e-3,
     K=100,
     symmetric_trick=True,
     dense=False,
-
     # epochs and early stopping
     epochs=200,
     early_stopping=50,
-
     # hyperparameters for training
     lr=0.05,
     weight_decay=0.0001,
     lr_decay=0.999,
-
     # stuffs
-    data_dir='data',
-    device='cuda',
+    data_dir="data",
+    device="cuda",
     verbose=False,
     seed=None,
-
     # model arguments
-    model='GCRN',
+    model="GCRN",
     input_dim=32,
     output_dim=32,
     decoder_dim=32,
@@ -137,7 +133,7 @@ def main(
 
     # use only one device
 
-    if device[:5] == 'cuda:':
+    if device[:5] == "cuda:":
         torch.cuda.set_device(int(device[5:]))
 
     # load dataset
@@ -151,50 +147,46 @@ def main(
         device,
         data_dir,
         seed=seed,
-        time_aggregation=time_aggregation
+        time_aggregation=time_aggregation,
     )
 
     # build model
 
     model_arguments = {
-        'input_dim': input_dim,
-        'output_dim': output_dim,
-        'device': device,
-        'renorm_order': 'sym',
-        **kwargs
+        "input_dim": input_dim,
+        "output_dim": output_dim,
+        "device": device,
+        "renorm_order": "sym",
+        **kwargs,
     }
 
-    if augment_method == 'tiara' and not symmetric_trick:
-        model_arguments['renorm_order'] = 'row'
+    if augment_method == "tiara" and not symmetric_trick:
+        model_arguments["renorm_order"] = "row"
 
     model_name = model
-    if model == 'GCN':
+    if model == "GCN":
         model = module.GCN(**model_arguments)
-    elif model == 'GCRN':
+    elif model == "GCRN":
         model = module.GCRN(**model_arguments)
-    elif model == 'EvolveGCN':
+    elif model == "EvolveGCN":
         model = module.EvolveGCN(num_nodes=dataset.num_nodes, **model_arguments)
+    elif model == "ours":
+        model = module.OurModel(**model_arguments)
     else:
         raise NotImplementedError("no such model {}".format(model))
 
     # build augmenter
 
-    tiara_argments = (
-        alpha, beta, eps, K,
-        symmetric_trick,
-        device,
-        dense,
-        verbose
-    )
+    tiara_argments = (alpha, beta, eps, K, symmetric_trick, device, dense, verbose)
 
-    if augment_method == 'tiara':
+    if augment_method == "tiara":
         augment_method = augmenter.Tiara(*tiara_argments)
-    elif augment_method == 'merge':
+    elif augment_method == "merge":
         augment_method = augmenter.Merge(device)
-    elif augment_method == 'none':
+    elif augment_method == "none":
         augment_method = augmenter.GCNNorm(device)
     else:
-        raise NotImplementedError('no such augmenter {}'.format(augment_method))
+        raise NotImplementedError("no such augmenter {}".format(augment_method))
 
     # build decoder, loss function, evaluator
 
@@ -211,15 +203,9 @@ def main(
 
     # train the model
 
-    trainer = Trainer(
-        model, decoder, lossfn, dataset, evaluator, augment_method
-    )
+    trainer = Trainer(model, decoder, lossfn, dataset, evaluator, augment_method)
     model, decoder, history = trainer.train(
-        epochs,
-        lr,
-        weight_decay,
-        lr_decay,
-        early_stopping
+        epochs, lr, weight_decay, lr_decay, early_stopping, kwargs["wan"]
     )
 
     # test the model
@@ -228,38 +214,46 @@ def main(
     decoder.eval()
 
     with torch.no_grad():
-        _, test_metric = trainer.calc_loss_and_metrics('test', True)
+        _, test_metric = trainer.calc_loss_and_metrics("test", True)
 
-    logger.info('dataset: {}'.format(dataset_name))
-    logger.info('model: {}'.format(model_name))
-    logger.info('seed: {}'.format(seed))
-    logger.info('final metric score is {:7.4f}'.format(test_metric))
+    logger.info("dataset: {}".format(dataset_name))
+    logger.info("model: {}".format(model_name))
+    logger.info("seed: {}".format(seed))
+    logger.info("final metric score is {:7.4f}".format(test_metric))
     return test_metric.item(), history
 
+
 def main_wraper(**kwargs):
-    conf_file = kwargs.get('conf_file', None)
+    conf_file = kwargs.get("conf_file", None)
     if conf_file is not None:
-        config = json.load(open(conf_file, 'r'))
+        config = json.load(open(conf_file, "r"))
         for k in kwargs:
             if k in config:
-                logger.warning('{} will be overwritten!'.format(k))
+                logger.warning("{} will be overwritten!".format(k))
 
         setting = {**config, **kwargs}
         report_setting(setting)
+        wan = wandb.init(project="ours", config=setting)
+        setting["wan"] = wan
         test_metric, history = main(**setting)
 
-        save_file = kwargs.get('save_file', None)
+        save_file = kwargs.get("save_file", None)
         if save_file is not None:
-            os.makedirs('results', exist_ok=True)
-            json.dump({'test_metric': test_metric, 'history': history}, open('results/' + save_file, 'w'))
+            os.makedirs("results", exist_ok=True)
+            json.dump(
+                {"test_metric": test_metric, "history": history},
+                open("results/" + save_file, "w"),
+            )
 
     else:
         report_setting(kwargs)
         main(**kwargs)
 
+
 def report_setting(setting):
     for k, v in setting.items():
-        logger.info('{}: {}'.format(k, v))
+        logger.info("{}: {}".format(k, v))
+
 
 if __name__ == "__main__":
     Fire(main_wraper)

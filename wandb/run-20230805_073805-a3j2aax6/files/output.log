@@ -1,0 +1,31 @@
+[32m2023-08-05 07:38:11.209[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mmodel: GCRN
+[32m2023-08-05 07:38:11.211[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mdataset: WikiElec
+[32m2023-08-05 07:38:11.211[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1maugment_method: none
+[32m2023-08-05 07:38:11.211[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mepochs: 200
+[32m2023-08-05 07:38:11.211[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mearly_stopping: 50
+[32m2023-08-05 07:38:11.212[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mnum_layers: 2
+[32m2023-08-05 07:38:11.212[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mlr: 0.05
+[32m2023-08-05 07:38:11.212[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mrnn: LSTM
+[32m2023-08-05 07:38:11.212[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mdropout: 0.0
+[32m2023-08-05 07:38:11.213[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mconf_file: settings/GCRN-WikiElec-none.json
+[32m2023-08-05 07:38:11.213[39m | [1mINFO    [22m | [36m__main__[39m:[36mreport_setting[39m:[36m254[39m - [1mseed: 117
+[32m2023-08-05 07:38:13.472[39m | [1mINFO    [22m | [36mdataset_loader.template[39m:[36mload[39m:[36m137[39m - [1mTemporalGraph(WikiElec, num_nodes=7125, num_edges=212856, num_timesteps=100)
+epoch:   0%|                                                                                                                        | 0/200 [00:02<?, ?it/s]
+Traceback (most recent call last):
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/main.py", line 258, in <module>
+    Fire(main_wraper)
+  File "/compuworks/anaconda3/envs/py39_p2/lib/python3.9/site-packages/fire/core.py", line 141, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/compuworks/anaconda3/envs/py39_p2/lib/python3.9/site-packages/fire/core.py", line 475, in _Fire
+    component, remaining_args = _CallAndUpdateTrace(
+  File "/compuworks/anaconda3/envs/py39_p2/lib/python3.9/site-packages/fire/core.py", line 691, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/main.py", line 236, in main_wraper
+    test_metric, history = main(**setting)
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/main.py", line 207, in main
+    model, decoder, history = trainer.train(
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/trainer.py", line 128, in train
+    self.wandb_log(history[-1])
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/trainer.py", line 149, in wandb_log
+    utils.wandb_log({k: v})
+AttributeError: module 'utils' has no attribute 'wandb_log'

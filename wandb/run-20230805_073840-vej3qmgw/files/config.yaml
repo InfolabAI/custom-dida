@@ -1,0 +1,66 @@
+wandb_version: 1
+
+model:
+  desc: null
+  value: GCRN
+dataset:
+  desc: null
+  value: WikiElec
+augment_method:
+  desc: null
+  value: none
+epochs:
+  desc: null
+  value: 200
+early_stopping:
+  desc: null
+  value: 50
+num_layers:
+  desc: null
+  value: 2
+lr:
+  desc: null
+  value: 0.05
+rnn:
+  desc: null
+  value: LSTM
+dropout:
+  desc: null
+  value: 0.0
+conf_file:
+  desc: null
+  value: settings/GCRN-WikiElec-none.json
+seed:
+  desc: null
+  value: 117
+_wandb:
+  desc: null
+  value:
+    python_version: 3.9.17
+    cli_version: 0.15.8
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1691221120.243954
+    t:
+      1:
+      - 1
+      - 50
+      - 55
+      - 64
+      - 76
+      - 77
+      2:
+      - 1
+      - 50
+      - 55
+      - 64
+      - 76
+      - 77
+      3:
+      - 16
+      - 23
+      4: 3.9.17
+      5: 0.15.8
+      8:
+      - 5

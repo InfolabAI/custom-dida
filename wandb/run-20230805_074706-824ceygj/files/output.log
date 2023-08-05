@@ -1,0 +1,15 @@
+[32m2023-08-05 07:47:14.086[39m | [1mINFO    [22m | [36mdataset_loader.template[39m:[36mload[39m:[36m137[39m - [1mTemporalGraph(WikiElec, num_nodes=7125, num_edges=212856, num_timesteps=100)
+Traceback (most recent call last):
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/main.py", line 259, in <module>
+    Fire(main_wraper)
+  File "/compuworks/anaconda3/envs/py39_p2/lib/python3.9/site-packages/fire/core.py", line 141, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/compuworks/anaconda3/envs/py39_p2/lib/python3.9/site-packages/fire/core.py", line 475, in _Fire
+    component, remaining_args = _CallAndUpdateTrace(
+  File "/compuworks/anaconda3/envs/py39_p2/lib/python3.9/site-packages/fire/core.py", line 691, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/main.py", line 238, in main_wraper
+    test_metric, history = main(**setting)
+  File "/mnt/share_nfs/my_method/custom_DIDA/src/main.py", line 208, in main
+    epochs, lr, weight_decay, lr_decay, early_stopping, wan
+NameError: name 'wan' is not defined
