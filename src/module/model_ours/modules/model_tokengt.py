@@ -42,7 +42,7 @@ class TokenGTModel(FairseqEncoderModel):
         if args.performer_finetune:
             self.encoder.performer_finetune_setup()
 
-        self.stem = nn.Linear(32, args.encoder_embed_dim, bias=bool(args.lin_bias))
+        # self.stem = nn.Linear(32, args.encoder_embed_dim, bias=bool(args.lin_bias))
 
     @staticmethod
     def add_args(parser):
@@ -209,23 +209,14 @@ class TokenGTModel(FairseqEncoderModel):
         """Build a new model instance."""
         # make sure all arguments are present in older models
         # base_architecture(args)
-        import json
-        from argparse import ArgumentParser
+        edit_args_to_use_performer(args)
 
-        parser = ArgumentParser()
-        tokengt_args = parser.parse_args([])
-        tokengt_args.__dict__ = json.load(
-            open("./model_ours/modules/argparse.json", "r")
-        )  ## argparse.json is from args at https://github.com/InfolabAI/tokengt_custom/blob/7e9f7c994fc7ba3247eec0f8442e064747cee42d/large-scale-regression/tokengt/models/tokengt.py#L217
-        merged_args = merge_namespaces(tokengt_args, args)
-        edit_args_to_use_performer(merged_args)
+        if not safe_hasattr(args, "max_nodes"):
+            args.max_nodes = args.tokens_per_sample
 
-        if not safe_hasattr(merged_args, "max_nodes"):
-            merged_args.max_nodes = merged_args.tokens_per_sample
+        encoder = TokenGTEncoder(args)
 
-        encoder = TokenGTEncoder(merged_args)
-
-        return cls(merged_args, encoder)
+        return cls(args, encoder)
 
     def forward(self, batched_data, **kwargs):
         # batched_data["node_data"] = self.stem(batched_data["node_data"])

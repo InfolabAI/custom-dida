@@ -1,6 +1,7 @@
 import torch
 from loguru import logger
 
+
 class NodeDecoder(torch.nn.Module):
     def __init__(self, emb_dim, decoder_dim, num_label, device):
         """
@@ -20,7 +21,7 @@ class NodeDecoder(torch.nn.Module):
         self.mlp = torch.nn.Sequential(
             torch.nn.Linear(emb_dim, decoder_dim),
             torch.nn.ReLU(),
-            torch.nn.Linear(decoder_dim, num_label)
+            torch.nn.Linear(decoder_dim, num_label),
         ).to(device)
 
     def forward(self, embedding):
@@ -35,6 +36,7 @@ class NodeDecoder(torch.nn.Module):
         Logits respect to given embedding and indices
         """
         return self.mlp(embedding)
+
 
 class PairDecoder(torch.nn.Module):
     def __init__(self, emb_dim, decoder_dim, device):
@@ -53,7 +55,7 @@ class PairDecoder(torch.nn.Module):
         self.mlp = torch.nn.Sequential(
             torch.nn.Linear(2 * emb_dim, decoder_dim),
             torch.nn.ReLU(),
-            torch.nn.Linear(decoder_dim, 2)
+            torch.nn.Linear(decoder_dim, 2),
         ).to(device)
 
     def forward(self, embedding, indices):

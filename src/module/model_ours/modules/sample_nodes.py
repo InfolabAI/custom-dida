@@ -77,7 +77,7 @@ class SampleNodes(nn.Module):
         """
         이전 backprop 정보를 제거함"""
         for i in range(len(list_of_dgl_graphs)):
-            list_of_dgl_graphs[i].ndata["w"] = list_of_dgl_graphs[i].ndata["w"].detach()
+            list_of_dgl_graphs[i].ndata["X"] = list_of_dgl_graphs[i].ndata["X"].detach()
 
     def forward(self, list_of_dgl_graphs):
         self._reset_backprop(list_of_dgl_graphs)
@@ -96,12 +96,12 @@ class SampleNodes(nn.Module):
         ]
 
         # backpropagation 시 grad 전파에 문제가 없도록 하기 위해 clone() 사용
-        node_features = list_of_dgl_graphs[0].ndata["w"].clone()
+        node_features = list_of_dgl_graphs[0].ndata["X"].clone()
         node_features[sampled_original_indices] = node_features[
             sampled_original_indices
         ] * mask[sampled_indices].unsqueeze(1)
 
         for i in range(len(list_of_dgl_graphs)):
-            list_of_dgl_graphs[i].ndata["w"] = node_features
+            list_of_dgl_graphs[i].ndata["X"] = node_features
 
         return list_of_dgl_graphs, sampled_original_indices

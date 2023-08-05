@@ -9,6 +9,7 @@ from dataset_loader.link import LinkDatasetTemplate
 from dataset_loader.node import NodeDatasetTemplate
 from trainer import Trainer
 from evaluator import AUCMetric, F1Metric
+from argparse import Namespace
 import augmenter
 
 
@@ -150,13 +151,28 @@ def main(
         time_aggregation=time_aggregation,
     )
 
-    # build model
+    # build augmenter
 
+    tiara_argments = (alpha, beta, eps, K, symmetric_trick, device, dense, verbose)
+
+    if augment_method == "tiara":
+        augment_method = augmenter.Tiara(*tiara_argments)
+    elif augment_method == "merge":
+        augment_method = augmenter.Merge(device)
+    elif augment_method == "none":
+        augment_method = augmenter.GCNNorm(device)
+    else:
+        raise NotImplementedError("no such augmenter {}".format(augment_method))
+
+    dataset.input_graphs = augment_method(dataset)
+
+    # build model
     model_arguments = {
         "input_dim": input_dim,
         "output_dim": output_dim,
         "device": device,
         "renorm_order": "sym",
+        "graphs": dataset,
         **kwargs,
     }
 
@@ -171,22 +187,9 @@ def main(
     elif model == "EvolveGCN":
         model = module.EvolveGCN(num_nodes=dataset.num_nodes, **model_arguments)
     elif model == "ours":
-        model = module.OurModel(**model_arguments)
+        model = module.OurModel(**model_arguments).to(kwargs["args"].device)
     else:
         raise NotImplementedError("no such model {}".format(model))
-
-    # build augmenter
-
-    tiara_argments = (alpha, beta, eps, K, symmetric_trick, device, dense, verbose)
-
-    if augment_method == "tiara":
-        augment_method = augmenter.Tiara(*tiara_argments)
-    elif augment_method == "merge":
-        augment_method = augmenter.Merge(device)
-    elif augment_method == "none":
-        augment_method = augmenter.GCNNorm(device)
-    else:
-        raise NotImplementedError("no such augmenter {}".format(augment_method))
 
     # build decoder, loss function, evaluator
 
@@ -203,7 +206,7 @@ def main(
 
     # train the model
 
-    trainer = Trainer(model, decoder, lossfn, dataset, evaluator, augment_method)
+    trainer = Trainer(model, decoder, lossfn, dataset, evaluator)
     model, decoder, history = trainer.train(
         epochs, lr, weight_decay, lr_decay, early_stopping, kwargs["wan"]
     )
@@ -231,10 +234,24 @@ def main_wraper(**kwargs):
             if k in config:
                 logger.warning("{} will be overwritten!".format(k))
 
+        #############################
+        # manipulate config here
         setting = {**config, **kwargs}
         report_setting(setting)
-        wan = wandb.init(project="ours", config=setting)
-        setting["wan"] = wan
+        if "wan" not in setting:
+            wan = wandb.init(project="ours", config=setting)
+            setting["wan"] = wan
+
+        args = Namespace(**setting)
+        setting["args"] = args
+
+        if "device_id" in setting:
+            args.device = torch.device("cuda:" + str(setting["device_id"]))
+        else:
+            args.device = torch.device("cuda:7")
+
+        #############################
+        # run experiment
         test_metric, history = main(**setting)
 
         save_file = kwargs.get("save_file", None)

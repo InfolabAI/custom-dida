@@ -5,18 +5,19 @@ from torch_geometric.nn.inits import glorot, zeros
 from utils import normalize_graph
 from loguru import logger
 
+
 class GCRN(torch.nn.Module):
     def __init__(
         self,
         input_dim=32,
         hidden_dim=32,
         output_dim=32,
-        rnn='LSTM',
+        rnn="LSTM",
         num_layers=3,
         dropout=0,
         dropedge=0,
-        renorm_order='sym',
-        device='cuda',
+        renorm_order="sym",
+        device="cuda",
         **_kwargs
     ):
         """
@@ -43,28 +44,30 @@ class GCRN(torch.nn.Module):
         """
         super().__init__()
 
-        dimensions = [input_dim] + (num_layers-1)*[hidden_dim] + [output_dim]
+        dimensions = [input_dim] + (num_layers - 1) * [hidden_dim] + [output_dim]
         self.layers = torch.nn.ModuleList()
         self.norms = torch.nn.ModuleList()
-        self.dropout =  torch.nn.Dropout(dropout)
+        self.dropout = torch.nn.Dropout(dropout)
         self.dropedge = dgl.DropEdge(dropedge) if dropedge > 0 else None
         self.renorm_order = renorm_order
         self.rnn = rnn
         self.act = torch.nn.ReLU()
 
-        if rnn == 'LSTM':
+        if rnn == "LSTM":
             GNN = GConvLSTM
-        elif rnn == 'GRU':
+        elif rnn == "GRU":
             GNN = GConvGRU
         else:
-            raise NotImplementedError('no such RNN model {}'.format(rnn))
+            raise NotImplementedError("no such RNN model {}".format(rnn))
 
-        for layer in range(len(dimensions)-1):
+        for layer in range(len(dimensions) - 1):
             self.layers.append(
-                GNN(dimensions[layer], dimensions[layer+1], normalize=False).to(device)
+                GNN(dimensions[layer], dimensions[layer + 1], normalize=False).to(
+                    device
+                )
             )
             self.norms.append(
-                torch.nn.BatchNorm1d(dimensions[layer+1], device=device)
+                torch.nn.BatchNorm1d(dimensions[layer + 1], device=device)
             )
 
     def norm(self, X, normfn):
@@ -98,15 +101,17 @@ class GCRN(torch.nn.Module):
         Embedding tensor
         """
         input_graphs = dataset.input_graphs[:end]
+        # 기본적으로 self.dropedge=None
         if self.training and self.dropedge:
             input_graphs = [
                 normalize_graph(
-                    self.dropedge(graph.remove_self_loop()).add_self_loop(), self.renorm_order
+                    self.dropedge(graph.remove_self_loop()).add_self_loop(),
+                    self.renorm_order,
                 )
                 for graph in input_graphs
             ]
 
-        feature = torch.stack([graph.ndata['X'] for graph in dataset[:end]])
+        feature = torch.stack([graph.ndata["X"] for graph in dataset[:end]])
         """
         (Pdb) p feature.shape
         torch.Size([69, 7125, 32])
@@ -131,12 +136,12 @@ class GCRN(torch.nn.Module):
                 torch.Size([7227])
                 """
 
-                if self.rnn == 'LSTM':
-                    H, C = layer(feat, indices, H=H, C=C, edge_weight=graph.edata['w'])
-                elif self.rnn == 'GRU':
-                    H = layer(feat, indices, H=H, edge_weight=graph.edata['w'])
+                if self.rnn == "LSTM":
+                    H, C = layer(feat, indices, H=H, C=C, edge_weight=graph.edata["w"])
+                elif self.rnn == "GRU":
+                    H = layer(feat, indices, H=H, edge_weight=graph.edata["w"])
                 else:
-                    raise NotImplementedError('no such RNN model {}'.format(self.rnn))
+                    raise NotImplementedError("no such RNN model {}".format(self.rnn))
 
                 Hs.append(H)
 
@@ -148,9 +153,11 @@ class GCRN(torch.nn.Module):
         """
         return feature[start:, :, :]
 
+
 # Original GCRN models used Chebyshev GCN, but we modified it to use Kipf's GCN due to memory limitation.
 # Below models are based on the source code from pytorch geometric temporal
 # See https://pytorch-geometric-temporal.readthedocs.io/en/latest/modules/root.html
+
 
 class GConvGRU(torch.nn.Module):
     def __init__(
@@ -169,7 +176,6 @@ class GConvGRU(torch.nn.Module):
         self._create_parameters_and_layers()
 
     def _create_update_gate_parameters_and_layers(self):
-
         self.conv_x_z = GCNConv(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
@@ -185,7 +191,6 @@ class GConvGRU(torch.nn.Module):
         )
 
     def _create_reset_gate_parameters_and_layers(self):
-
         self.conv_x_r = GCNConv(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
@@ -201,7 +206,6 @@ class GConvGRU(torch.nn.Module):
         )
 
     def _create_candidate_state_parameters_and_layers(self):
-
         self.conv_x_h = GCNConv(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
@@ -278,6 +282,7 @@ class GConvGRU(torch.nn.Module):
         H = self._calculate_hidden_state(Z, H, H_tilde)
         return H
 
+
 class GConvLSTM(torch.nn.Module):
     def __init__(
         self,
@@ -296,7 +301,6 @@ class GConvLSTM(torch.nn.Module):
         self._set_parameters()
 
     def _create_input_gate_parameters_and_layers(self):
-
         self.conv_x_i = GCNConv(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
@@ -315,7 +319,6 @@ class GConvLSTM(torch.nn.Module):
         self.b_i = Parameter(torch.Tensor(1, self.out_channels))
 
     def _create_forget_gate_parameters_and_layers(self):
-
         self.conv_x_f = GCNConv(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
@@ -334,7 +337,6 @@ class GConvLSTM(torch.nn.Module):
         self.b_f = Parameter(torch.Tensor(1, self.out_channels))
 
     def _create_cell_state_parameters_and_layers(self):
-
         self.conv_x_c = GCNConv(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
@@ -352,7 +354,6 @@ class GConvLSTM(torch.nn.Module):
         self.b_c = Parameter(torch.Tensor(1, self.out_channels))
 
     def _create_output_gate_parameters_and_layers(self):
-
         self.conv_x_o = GCNConv(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
@@ -403,7 +404,14 @@ class GConvLSTM(torch.nn.Module):
         I = torch.sigmoid(I)
         return I
 
-    def _calculate_forget_gate(self, X, edge_index, edge_weight, H, C,):
+    def _calculate_forget_gate(
+        self,
+        X,
+        edge_index,
+        edge_weight,
+        H,
+        C,
+    ):
         F = self.conv_x_f(X, edge_index, edge_weight)
         F = F + self.conv_h_f(H, edge_index, edge_weight)
         F = F + (self.w_c_f * C)
@@ -419,7 +427,14 @@ class GConvLSTM(torch.nn.Module):
         C = F * C + I * T
         return C
 
-    def _calculate_output_gate(self, X, edge_index, edge_weight, H, C,):
+    def _calculate_output_gate(
+        self,
+        X,
+        edge_index,
+        edge_weight,
+        H,
+        C,
+    ):
         O = self.conv_x_o(X, edge_index, edge_weight)
         O = O + self.conv_h_o(H, edge_index, edge_weight)
         O = O + (self.w_c_o * C)

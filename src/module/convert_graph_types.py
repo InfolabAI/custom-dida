@@ -151,7 +151,7 @@ class ConvertGraphTypes:
             )
 
             dglG = dgl.graph((edge_tensor[0], edge_tensor[1]), num_nodes=num_nodes)
-            dglG.ndata["w"] = node_features
+            dglG.ndata["X"] = node_features
             dglG.edata["w"] = edge_features
             list_of_dgl_graphs.append(dglG.to(device))
 
@@ -165,13 +165,13 @@ class ConvertGraphTypes:
         tr_input_pool = defaultdict(list)
         tr_input_pool["indices_subnodes"] = torch.Tensor(new_node_indices).int()
         subgraph = dgl.node_subgraph(list_of_dgl_graphs[0], new_node_indices)
-        tr_input_pool["node_data"] = subgraph.ndata["w"]
+        tr_input_pool["node_data"] = subgraph.ndata["X"]
         return tr_input_pool
 
     def dglG_list_to_TrInputDict(
         self, list_of_dgl_graphs, sampled_original_indices=None
     ):
-        device = list_of_dgl_graphs[0].ndata["w"].device
+        device = list_of_dgl_graphs[0].ndata["X"].device
         comm = self._get_activated_communities(list_of_dgl_graphs)
         tr_input = defaultdict(list)
         node_data_index = 0
@@ -190,7 +190,7 @@ class ConvertGraphTypes:
             subgraph = dgl.node_subgraph(list_of_dgl_graphs[t], indices)
             tr_input["indices_subnodes"].append(torch.Tensor(indices).int())
 
-            tr_input["node_data"].append(subgraph.ndata["w"])
+            tr_input["node_data"].append(subgraph.ndata["X"])
 
             ########################
             ## activated_nodes 에 해당하는 edge 만 사용
@@ -209,7 +209,7 @@ class ConvertGraphTypes:
 
             # node i, j 의 feature 를 연산하여 edge feature 로 사용
             tr_input["edge_data"].append(
-                subgraph.ndata["w"][srcids] * subgraph.ndata["w"][dstids]
+                subgraph.ndata["X"][srcids] * subgraph.ndata["X"][dstids]
             )
             edge_tensor = torch.concat([srcids.unsqueeze(0), dstids.unsqueeze(0)])
             tr_input["edge_index"].append(edge_tensor)
@@ -219,7 +219,7 @@ class ConvertGraphTypes:
         tr_input["node_data"] = torch.concat(tr_input["node_data"])
         tr_input["edge_data"] = torch.concat(tr_input["edge_data"])
         tr_input["edge_index"] = torch.concat(tr_input["edge_index"], dim=1)
-        tr_input["x"] = list_of_dgl_graphs[0].ndata["w"]
+        tr_input["x"] = list_of_dgl_graphs[0].ndata["X"]
 
         return tr_input
 
@@ -237,7 +237,7 @@ class ConvertGraphTypes:
         graph = dgl.graph(
             (indices[0, :], indices[1, :]), num_nodes=node_features.shape[0]
         )
-        graph.ndata["w"] = node_features
+        graph.ndata["X"] = node_features
 
         graph = graph.remove_self_loop()
         graph.remove_edges(indices_to_be_removed)

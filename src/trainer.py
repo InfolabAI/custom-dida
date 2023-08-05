@@ -11,7 +11,7 @@ import utils
 
 
 class Trainer:
-    def __init__(self, model, decoder, lossfn, dataset, evaluator, augment_method):
+    def __init__(self, model, decoder, lossfn, dataset, evaluator):
         """
         Parameters
         ----------
@@ -25,15 +25,12 @@ class Trainer:
             dataset
         evaluator
             evaluator
-        augment_method
-            dataset augmentation method
         """
         self.model = model
         self.decoder = decoder
         self.lossfn = lossfn
         self.dataset = dataset
         self.evaluator = evaluator
-        self.dataset.input_graphs = augment_method(dataset)
 
     def train(self, epochs, lr, weight_decay, lr_decay, early_stopping, wan):
         """
