@@ -1,0 +1,11 @@
+{
+	"model": "GCRN",
+	"dataset": "WikiElec",
+	"augment_method": "none",
+	"epochs": 200,
+	"early_stopping": 50,
+	"num_layers": 2,
+	"lr": 0.05,
+	"rnn": "LSTM",
+	"dropout": 0.0
+}
