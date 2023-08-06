@@ -15,28 +15,11 @@ class Disentangler(nn.Module):
         self.comp_len = comp_len
         self.comp_dim = comp_dim
         self.encode_layer_norm = nn.LayerNorm(embed_dim)
-        self.encode_final_layer_norm = nn.LayerNorm(comp_len * comp_dim * 2)
+        self.encode_final_layer_norm = nn.LayerNorm(comp_len * comp_dim)
         self.decode_norm = nn.LayerNorm(comp_dim)
         self.scga = ScatterAndGather(args, embed_dim)
-        self.node_comp_mlps = nn.ModuleList(
-            {
-                # nn.Sequential(
-                #    nn.Linear(embed_dim, self.comp_dim * 2),
-                #    nn.GELU(),
-                #    nn.Dropout1d(0.1),
-                #    nn.Linear(self.comp_dim * 2, self.comp_dim),
-                # )
-                nn.AdaptiveAvgPool1d(comp_dim)
-                for _ in range(comp_len)
-            }
-        )
+        self.node_comp_mlps = nn.AdaptiveAvgPool1d(comp_dim)
         self.node_decomp_mlps = nn.AdaptiveAvgPool1d(embed_dim)
-        # nn.Sequential(
-        #    nn.Linear(self.comp_dim, self.comp_dim * 2),
-        #    nn.GELU(),
-        #    nn.Dropout1d(0.1),
-        #    nn.Linear(self.comp_dim * 2, embed_dim),
-        # )
         self.ortho_loss = torch.zeros(1).squeeze(0).float().to(args.device)
 
     def encode(
@@ -63,13 +46,15 @@ class Disentangler(nn.Module):
             nodes,
             node_num,
             indices_subnodes,
-            self.args.batched_data["x"],
+            self.args.graphs,
             time_entirenodes_emdim,
             is_mlp=False,
         )
         if indices_subnodes is None:
             indices_subnodes = self.args.batched_data["indices_subnodes"]
 
+        # 두번 뽑아서 comp_len 의 2배 길이가 되는 상황에 comp_len 으로 맞추기 위해 // 2
+        len_ = self.comp_len // 2
         if self.training:
             # activated 횟수가 많은 node 순서대로 정렬 (unique 면서 sort 된 순서대로니 counts 의 index 가 node 번호와 같고, counts 를 다시 sort 했으니, 많은 순서대로 정렬한 것)
             sorted_act_nodes = (
@@ -79,17 +64,17 @@ class Disentangler(nn.Module):
                 )[1]
                 # 1: sort 한 뒤의 indices
             ).sort(descending=True)[1]
-            baskets = [[] for _ in range(self.comp_len)]
+            baskets = [[] for _ in range(len_)]
             # 각 basket 의 node 들의 activated 횟수가 유사하도록 배분
             for i, node in enumerate(sorted_act_nodes):
-                baskets[i % self.comp_len].append(int(node))
+                baskets[i % len_].append(int(node))
             baskets = [np.array(x) for x in baskets]
             max_len = np.array([len(x) for x in baskets]).max()
             stacked_indices1 = np.stack(
                 [np.pad(x, (0, max_len - len(x))) for x in baskets]
             )
             # 각 basket 의 node 들의 activated 횟수가 매우 상이하도록 배분
-            baskets = np.array_split(sorted_act_nodes, self.comp_len)
+            baskets = np.array_split(sorted_act_nodes, len_)
             max_len = np.array([len(x) for x in baskets]).max()
             stacked_indices2 = np.stack(
                 [np.pad(x, (0, max_len - len(x))) for x in baskets]
@@ -98,7 +83,7 @@ class Disentangler(nn.Module):
                 [stacked_indices1, stacked_indices2], axis=0
             )
 
-        pooled = self.node_comp_mlps[0](time_entirenodes_emdim)
+        pooled = self.node_comp_mlps(time_entirenodes_emdim)
         pooled = (
             pooled[:, self.stacked_indices, :].sum(2) / self.stacked_indices.shape[1]
         ).reshape(pooled.shape[0], 1, -1)
@@ -129,18 +114,15 @@ class Disentangler(nn.Module):
         time_entirenodes_emdim = self.node_decomp_mlps(
             self.decode_norm(time_entirenodes_emdim)
         )
-        if self.args.handling_time_att == "att_x_all":
-            time_tokens_emdim = torch.zeros(
-                x.shape[0], self.num_tokens, self.embed_dim, device=x.device
-            )
-            time_tokens_emdim[padded_node_mask, :] = self.scga._from_entire(
-                time_entirenodes_emdim, self.args.batched_data
-            )
-            logger.debug("att_x_all")
-        else:
-            time_tokens_emdim = None
 
-        return time_entirenodes_emdim, time_tokens_emdim
+        time_tokens_emdim = torch.zeros(
+            x.shape[0], self.num_tokens, self.embed_dim, device=x.device
+        )
+        time_tokens_emdim[padded_node_mask, :] = self.scga._from_entire(
+            time_entirenodes_emdim, self.args.batched_data
+        )
+
+        return time_tokens_emdim
 
     def orthogonality_loss(self, *tensors):
         """

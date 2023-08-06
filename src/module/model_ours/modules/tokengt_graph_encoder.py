@@ -86,16 +86,18 @@ class TokenGTGraphEncoder(nn.Module):
         self.performer = performer
         self.performer_finetune = performer_finetune
 
-        self.custom = nn.ModuleList(
-            [
-                CustomMultiheadAttention(
-                    args,
-                    embedding_dim,
-                    attention_dropout,
-                )
-                for layer_idx in range(num_encoder_layers)
-            ]
-        )
+        if self.args.featureprop["version"] != 0:
+            self.custom = nn.ModuleList(
+                [
+                    CustomMultiheadAttention(
+                        args,
+                        embedding_dim,
+                        attention_dropout,
+                    )
+                    for layer_idx in range(num_encoder_layers)
+                ]
+            )
+
         self.graph_feature = GraphFeatureTokenizer(
             args=args,
             hidden_dim=embedding_dim,
@@ -321,8 +323,8 @@ class TokenGTGraphEncoder(nn.Module):
                 self_attn_mask=attn_mask,
                 self_attn_bias=None,
             )
-            if self.args.featureprop:
-                x, tee = self.custom[i](
+            if self.args.featureprop["version"] != 0:
+                x = self.custom[i](
                     x=x,
                     padded_node_mask=padded_node_mask,
                     padded_edge_mask=padded_edge_mask,

@@ -23,7 +23,7 @@ class ORFApplier(nn.Module):
             mode="reduced",
         )
         # [1, num_entire_nodes, hidden_dim] -> [num_entire_nodes, hidden_dim]
-        self.orf = torch.nn.functional.normalize(q, p=2, dim=2)
+        self.orf = torch.nn.functional.normalize(q, p=2, dim=2).to(args.device)
 
         self.step = 0
 
@@ -119,7 +119,7 @@ class OurModel(nn.Module):
         #    self.args, "tokenizer", self.main_model.encoder.graph_encoder.graph_feature
         # )
         setattr(self.args, "batched_data", self.tr_input)
-        setattr(self.args, "list_of_dgl_graphs", graphs)
+        setattr(self.args, "graphs", graphs)
 
         # [sum(activated_nodes) of all the timestamps, embed_dim]
         embeddings, list_ = self.main_model(self.tr_input, get_embedding=True)

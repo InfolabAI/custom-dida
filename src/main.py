@@ -242,7 +242,7 @@ def main_wraper(**kwargs):
     #############################
     # manipulate config here
     setting = {**config, **kwargs}
-    report_setting(setting)
+    # report_setting(setting)
     if "wan" not in setting:
         wan = wandb.init(project="ours", config=setting)
         setting["wan"] = wan
@@ -251,9 +251,12 @@ def main_wraper(**kwargs):
     setting["args"] = args
 
     if "device_id" in setting:
-        args.device = torch.device("cuda:" + str(setting["device_id"]))
+        device = "cuda:" + str(setting["device_id"])
     else:
-        args.device = torch.device("cuda:7")
+        device = "cuda:0"
+
+    args.device = torch.device(device)
+    setting["device"] = device
 
     #############################
     # run experiment
