@@ -1,0 +1,31 @@
+# sample.yaml
+program: src/main.py
+method: bayes
+name: test_sweep
+description: propagation sweep version 1
+project: ours
+entity: felight87
+metric:
+  name: test_metric 
+  goal: maximize
+
+parameters:
+  lr:
+    min: 0.0001
+    max: 0.1
+  lr_scheduler:
+    values:
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 500, "end_learning_rate": 1e-5, "power": 1.0 }
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 500, "end_learning_rate": 1e-5, "power": 2.0 }
+      - { "sched": "polynomial", "warmup_updates": 20, "total_num_update": 500, "end_learning_rate": 1e-5, "power": 1.0 }
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 300, "end_learning_rate": 1e-5, "power": 1.0 }
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 500, "end_learning_rate": 1e-9, "power": 1.0 }
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 500, "end_learning_rate": 1e-3, "power": 1.0 }
+      - {"sched": "step"}
+  num_division_edgeprop:
+    distribution: int_uniform
+    min: 0
+    max: 10
+early_terminate:
+  type: hyperband
+  min_iter: 50

@@ -1,6 +1,7 @@
 import torch
 from loguru import logger
 
+
 class PairLoss(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -22,6 +23,7 @@ class PairLoss(torch.nn.Module):
         logits = torch.concat(logits)
         labels = torch.concat(labels)
         return self.fn(logits, labels).mean()
+
 
 class NodeLoss(torch.nn.Module):
     def __init__(self):

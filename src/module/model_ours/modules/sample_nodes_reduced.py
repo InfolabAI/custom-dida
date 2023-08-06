@@ -22,7 +22,7 @@ class SampleNodes(nn.Module):
         super().__init__()
         self.args = args
         self.num = 1
-        self.num_division = 10
+        self.num_division = args.num_division_edgeprop
         #############################
         ### set sample_weight for gumbel softmax
         self.sample_weights = nn.Parameter(
@@ -55,21 +55,8 @@ class SampleNodes(nn.Module):
 
     def forward(self, list_of_dgl_graphs):
         self._reset_backprop(list_of_dgl_graphs)
-
-        self.args.debug_logger.writer.add_histogram(
-            f"sample/{self.training}_sample_weights",
-            self.sample_weights.detach(),
-            self.args.total_step,
-        )
-
         mask, sampled_index = self._sample_from_hard_vectors(self.num)
-        self.args.debug_logger.writer.add_histogram(
-            f"sample/{self.training}_sampled_indices",
-            sampled_index,
-            self.args.total_step,
-            bins=[x - 0.5 for x in range(self.sample_weights.shape[0] + 1)],
-        )
-        logger.info(f"{self.training} sampled_index: {sampled_index}")
+        logger.info(f"sampled_index: {sampled_index}")
 
         sampled_original_indices = torch.from_numpy(
             np.array_split(np.arange(self.args.num_nodes), self.num_division)[
@@ -79,13 +66,12 @@ class SampleNodes(nn.Module):
         if not self.training:
             return list_of_dgl_graphs, sampled_original_indices
 
-        # backpropagation 시 grad 전파에 문제가 없도록 하기 위해 clone() 사용
-        node_features = list_of_dgl_graphs[0].ndata["X"].clone()
-        node_features[sampled_original_indices] = node_features[
-            sampled_original_indices
-        ] * mask[sampled_index].unsqueeze(0).unsqueeze(1)
-
         for i in range(len(list_of_dgl_graphs)):
+            # backpropagation 시 grad 전파에 문제가 없도록 하기 위해 clone() 사용
+            node_features = list_of_dgl_graphs[i].ndata["X"]
+            node_features[sampled_original_indices] = node_features[
+                sampled_original_indices
+            ].clone() * mask[sampled_index].unsqueeze(0).unsqueeze(1)
             list_of_dgl_graphs[i].ndata["X"] = node_features
 
         return list_of_dgl_graphs, sampled_original_indices

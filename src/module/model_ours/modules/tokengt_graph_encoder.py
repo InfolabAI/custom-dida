@@ -321,7 +321,7 @@ class TokenGTGraphEncoder(nn.Module):
                 self_attn_mask=attn_mask,
                 self_attn_bias=None,
             )
-            if self.args.propagate == "inneraug":
+            if self.args.featureprop:
                 x, tee = self.custom[i](
                     x=x,
                     padded_node_mask=padded_node_mask,

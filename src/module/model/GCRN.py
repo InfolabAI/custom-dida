@@ -18,7 +18,7 @@ class GCRN(torch.nn.Module):
         dropedge=0,
         renorm_order="sym",
         device="cuda",
-        **_kwargs
+        **_kwargs,
     ):
         """
         Parameters
@@ -151,6 +151,7 @@ class GCRN(torch.nn.Module):
         (Pdb) p feature.shape
         torch.Size([69, 7125, 32])
         """
+
         return feature[start:, :, :]
 
 

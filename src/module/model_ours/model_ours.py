@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import copy
 
 from loguru import logger
 from ..convert_graph_types import ConvertGraphTypes
@@ -49,9 +50,9 @@ class GeneratePool:
             else:
                 new_At = At + At.matmul(new_At)
 
-            logger.info(
-                f"newAt #edges(newAt/At), newAt #nodes(newAt/At): {new_At.coalesce().values().shape[0]}({new_At.coalesce().values().shape[0]/At.coalesce().values().shape[0]:.2f}) , {new_At.coalesce().indices().unique().shape[0]}({new_At.coalesce().indices().unique().shape[0]/At.coalesce().indices().unique().shape[0]:.2f})"
-            )
+            # logger.info(
+            #     f"newAt #edges(newAt/At), newAt #nodes(newAt/At): {new_At.coalesce().values().shape[0]}({new_At.coalesce().values().shape[0]/At.coalesce().values().shape[0]:.2f}) , {new_At.coalesce().indices().unique().shape[0]}({new_At.coalesce().indices().unique().shape[0]/At.coalesce().indices().unique().shape[0]:.2f})"
+            # )
             new_At_list.append(new_At)
 
         return new_At_list
@@ -90,7 +91,7 @@ class OurModel(nn.Module):
             # attn [T] -> [T, 1, 1], then [T, 1, 1] * [T, #nodes, #nodes], then [T, #nodes, #nodes] -> [#nodes, #nodes]
             new_graph = self.cgt.weighted_adjacency_to_graph(
                 new_At,
-                # 사실 모든 ori_dglG 는 같은 ndata 를 가지고 있어서 [0]번째 nddata 를 게속 써도 상관없음
+                # 모든 ori_dglG 는 다른 ndata 를 가지고 있음
                 ori_dglG.ndata["X"],
             )
             list_of_dgl_graphs_for_pool.append(new_graph)
@@ -98,23 +99,28 @@ class OurModel(nn.Module):
         return list_of_dgl_graphs_for_pool
 
     def forward(self, dataset, start, end):
-        dataset.input_graphs = dataset.input_graphs[:end]
-        dataset.graphs = dataset.graphs[:end]
+        # logger.debug(f"start: {start}, end: {end}")
+        # 여기서 dataset을 변경하면 안됨. trainer 에서 start, end 계산과 의존성이 있기 때문.
+        graphs = dataset.graphs[:end]
         sampled_original_indices = None
-        if self.args.propagate == "intervene_node":
-            dataset, sampled_original_indices = self.sample_nodes(dataset)
+        graphs = copy.deepcopy(graphs)
+
+        for i in range(len(graphs)):
+            graphs[i].ndata["X"] = self.orf_applier(graphs[i].ndata["X"])
+
+        if self.args.num_division_edgeprop > 0:
+            graphs, sampled_original_indices = self.sample_nodes(graphs)
 
         self.tr_input = self.cgt.dglG_list_to_TrInputDict(
-            dataset, sampled_original_indices
+            graphs, sampled_original_indices
         )
 
-        self.tr_input["x"] = self.orf_applier(self.tr_input["x"])
-
-        setattr(
-            self.args, "tokenizer", self.main_model.encoder.graph_encoder.graph_feature
-        )
+        # setattr(
+        #    self.args, "tokenizer", self.main_model.encoder.graph_encoder.graph_feature
+        # )
         setattr(self.args, "batched_data", self.tr_input)
-        setattr(self.args, "list_of_dgl_graphs", dataset)
+        setattr(self.args, "list_of_dgl_graphs", graphs)
+
         # [sum(activated_nodes) of all the timestamps, embed_dim]
         embeddings, list_ = self.main_model(self.tr_input, get_embedding=True)
 
@@ -122,10 +128,9 @@ class OurModel(nn.Module):
             x=embeddings,
             total_node_num=list_[1],
             total_indices_subnodes=list_[2],
-            original_x=self.args.batched_data["x"],
+            graphs=graphs,
             entire_features=list_[0],
             is_mlp=True,
         )
-        logger.debug("att_x")
-        breakpoint()
+
         return features[start:, :, :]

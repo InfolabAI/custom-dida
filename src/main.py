@@ -208,7 +208,7 @@ def main(
 
     trainer = Trainer(model, decoder, lossfn, dataset, evaluator)
     model, decoder, history = trainer.train(
-        epochs, lr, weight_decay, lr_decay, early_stopping, kwargs["wan"]
+        epochs, lr, weight_decay, lr_decay, early_stopping, kwargs["args"]
     )
 
     # test the model
@@ -228,43 +228,44 @@ def main(
 
 def main_wraper(**kwargs):
     conf_file = kwargs.get("conf_file", None)
-    if conf_file is not None:
-        config = json.load(open(conf_file, "r"))
-        for k in kwargs:
-            if k in config:
-                logger.warning("{} will be overwritten!".format(k))
+    seed = kwargs.get("seed", None)
+    if conf_file is None:
+        conf_file = "settings/ours-WikiElec-none.json"
+        kwargs["conf_file"] = conf_file
+    if seed is None:
+        kwargs["seed"] = 117
+    config = json.load(open(conf_file, "r"))
+    for k in kwargs:
+        if k in config:
+            logger.warning("{} will be overwritten!".format(k))
 
-        #############################
-        # manipulate config here
-        setting = {**config, **kwargs}
-        report_setting(setting)
-        if "wan" not in setting:
-            wan = wandb.init(project="ours", config=setting)
-            setting["wan"] = wan
+    #############################
+    # manipulate config here
+    setting = {**config, **kwargs}
+    report_setting(setting)
+    if "wan" not in setting:
+        wan = wandb.init(project="ours", config=setting)
+        setting["wan"] = wan
 
-        args = Namespace(**setting)
-        setting["args"] = args
+    args = Namespace(**setting)
+    setting["args"] = args
 
-        if "device_id" in setting:
-            args.device = torch.device("cuda:" + str(setting["device_id"]))
-        else:
-            args.device = torch.device("cuda:7")
-
-        #############################
-        # run experiment
-        test_metric, history = main(**setting)
-
-        save_file = kwargs.get("save_file", None)
-        if save_file is not None:
-            os.makedirs("results", exist_ok=True)
-            json.dump(
-                {"test_metric": test_metric, "history": history},
-                open("results/" + save_file, "w"),
-            )
-
+    if "device_id" in setting:
+        args.device = torch.device("cuda:" + str(setting["device_id"]))
     else:
-        report_setting(kwargs)
-        main(**kwargs)
+        args.device = torch.device("cuda:7")
+
+    #############################
+    # run experiment
+    test_metric, history = main(**setting)
+
+    save_file = kwargs.get("save_file", None)
+    if save_file is not None:
+        os.makedirs("results", exist_ok=True)
+        json.dump(
+            {"test_metric": test_metric, "history": history},
+            open("results/" + save_file, "w"),
+        )
 
 
 def report_setting(setting):

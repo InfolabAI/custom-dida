@@ -7,6 +7,7 @@ from itertools import chain
 from dataset_loader.link import LinkDatasetTemplate
 from dataset_loader.node import NodeDatasetTemplate
 from dataset_loader.utils import negative_sampling
+from module.model_ours.modules.lr import PolynomialDecayLR
 import utils
 
 
@@ -32,7 +33,7 @@ class Trainer:
         self.dataset = dataset
         self.evaluator = evaluator
 
-    def train(self, epochs, lr, weight_decay, lr_decay, early_stopping, wan):
+    def train(self, epochs, lr, weight_decay, lr_decay, early_stopping, args):
         """
         Parameters
         ----------
@@ -63,7 +64,20 @@ class Trainer:
             lr=lr,
             weight_decay=weight_decay,
         )
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, lr_decay)
+        sched = getattr(args, "lr_scheduler", {"sched": "step"})
+        if sched["sched"] == "step":
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, lr_decay)
+        elif sched["sched"] == "polynomial":
+            scheduler = PolynomialDecayLR(
+                optimizer,
+                sched["warmup_updates"],
+                sched["total_num_update"],
+                lr,
+                sched["end_learning_rate"],
+                sched["power"],
+            )
+        else:
+            raise NotImplementedError
 
         best_model_state = deepcopy(self.model.state_dict())
         best_decoder_state = deepcopy(self.decoder.state_dict())
@@ -84,6 +98,9 @@ class Trainer:
 
             optimizer.zero_grad()
             train_loss.backward()
+            # clip gradient norm
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5.0)
+
             optimizer.step()
 
             epoch_message = "train loss: {:7.4f}, train metric: {:7.4}".format(
@@ -121,9 +138,12 @@ class Trainer:
                     "val_loss": val_loss.item(),
                     "test_metric": test_metric.item(),
                     "test_loss": test_loss.item(),
+                    # code to get lr from optimizer
+                    "lr": scheduler.optimizer.param_groups[0]["lr"],
                 }
             )
-            wandb.log(history[-1])
+            if getattr(args, "wan", True):
+                wandb.log(history[-1])
 
             if val_metric > best_val_metric:
                 best_val_metric = val_metric

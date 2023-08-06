@@ -34,7 +34,7 @@ class ScatterAndGather(nn.Module):
         x,
         total_node_num,
         total_indices_subnodes,
-        original_x,
+        graphs,
         entire_features=None,
         is_mlp=True,
     ):
@@ -56,7 +56,7 @@ class ScatterAndGather(nn.Module):
             offset += node_num
 
             ta = t_activated_embedding
-            bd = original_x
+            bd = graphs[t].ndata["X"]
 
             ta_nonzero += ta.mean(1).nonzero().size(0)
             ta_mean += ta.abs().mean()
@@ -68,9 +68,9 @@ class ScatterAndGather(nn.Module):
 
             t_entire_embeddings.append(t_embedding)
 
-        logger.info(
-            f"ta_nonzero: {ta_nonzero}, ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
-        )
+        # logger.info(
+        #     f"ta_nonzero: {ta_nonzero}, ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
+        # )
         ret = torch.stack(t_entire_embeddings, dim=0)
         if entire_features is not None:
             ret = ret + entire_features

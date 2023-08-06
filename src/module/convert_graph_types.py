@@ -190,6 +190,7 @@ class ConvertGraphTypes:
             subgraph = dgl.node_subgraph(list_of_dgl_graphs[t], indices)
             tr_input["indices_subnodes"].append(torch.Tensor(indices).int())
 
+            # t 에서 가져온 subgraph 의 ndata 를 사용하므로 t 마다 ndata 가 달라도 문제없음
             tr_input["node_data"].append(subgraph.ndata["X"])
 
             ########################
@@ -219,7 +220,6 @@ class ConvertGraphTypes:
         tr_input["node_data"] = torch.concat(tr_input["node_data"])
         tr_input["edge_data"] = torch.concat(tr_input["edge_data"])
         tr_input["edge_index"] = torch.concat(tr_input["edge_index"], dim=1)
-        tr_input["x"] = list_of_dgl_graphs[0].ndata["X"]
 
         return tr_input
 
