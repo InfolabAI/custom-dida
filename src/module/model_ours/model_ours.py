@@ -48,7 +48,10 @@ class GeneratePool:
             if new_At is None:
                 new_At = At
             else:
-                new_At = At + At.matmul(new_At)
+                if self.args.dataset == "RedditBody":
+                    new_At = At + new_At
+                else:
+                    new_At = At + At.matmul(new_At)
 
             # logger.info(
             #     f"newAt #edges(newAt/At), newAt #nodes(newAt/At): {new_At.coalesce().values().shape[0]}({new_At.coalesce().values().shape[0]/At.coalesce().values().shape[0]:.2f}) , {new_At.coalesce().indices().unique().shape[0]}({new_At.coalesce().indices().unique().shape[0]/At.coalesce().indices().unique().shape[0]:.2f})"

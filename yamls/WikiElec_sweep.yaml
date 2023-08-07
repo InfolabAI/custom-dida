@@ -1,0 +1,77 @@
+# sample.yaml
+program: src/main.py
+method: bayes
+name: test_sweep
+description: propagation sweep version 1
+project: ours
+entity: felight87
+metric:
+  name: test_metric 
+  goal: maximize
+
+parameters:
+  dataset:
+    value: WikiElec
+  lr:
+    min: 0.0001
+    max: 0.1
+  weight_decay:
+    min: 0.0000000005
+    max: 0.05
+  encoder_layers:
+    distribution: categorical
+    values: [2, 3, 4, 5]
+  encoder_attention_heads:
+    distribution: categorical
+    values: [2, 4, 8, 16]
+  lr_scheduler:
+    distribution: categorical
+    values:
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 500, "end_learning_rate": 1e-5, "power": 1.0 }
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 500, "end_learning_rate": 1e-5, "power": 2.0 }
+      - { "sched": "polynomial", "warmup_updates": 20, "total_num_update": 500, "end_learning_rate": 1e-5, "power": 1.0 }
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 300, "end_learning_rate": 1e-5, "power": 1.0 }
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 500, "end_learning_rate": 1e-9, "power": 1.0 }
+      - { "sched": "polynomial", "warmup_updates": 10, "total_num_update": 500, "end_learning_rate": 1e-3, "power": 1.0 }
+      - {"sched": "step"}
+  num_division_edgeprop:
+    distribution: int_uniform
+    min: 0
+    max: 10
+  featureprop:
+    parameters:
+      version:
+        distribution: int_uniform
+        min: 0
+        max: 9
+      time_att_0d_dropout:
+        min: 0.0
+        max: 0.9
+      time_att_2d_dropout:
+        min: 0.0
+        max: 0.9
+      comp_len:
+        distribution: q_uniform
+        min: 2
+        max: 30
+        q: 2
+      comp_dim:
+        distribution: q_uniform
+        min: 2
+        max: 10
+        q: 2
+  attention_dropout:
+    min: 0.0
+    max: 0.9
+  act_dropout:
+    min: 0.0
+    max: 0.9
+  dropout:
+    min: 0.0
+    max: 0.9
+  scatter_dropout:
+    min: 0.0
+    max: 0.9
+early_terminate:
+  type: hyperband
+  min_iter: 50
