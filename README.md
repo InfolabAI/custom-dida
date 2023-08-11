@@ -39,18 +39,18 @@
 - Create wandb's account and initialize your project by following [Quickstart](https://docs.wandb.ai/quickstart)
 - Run wandb's sweep by following [Define sweep configuration](https://docs.wandb.ai/guides/sweeps/define-sweep-configuration), [Initialize sweeps](https://docs.wandb.ai/guides/sweeps/initialize-sweeps) and [Start sweep agents](https://docs.wandb.ai/guides/sweeps/start-sweep-agents)
 - Example
-    - run the project without HPO on WikiElec
+    - run the project on WikiElec without HPO
     ```bash
     python src/main.py --conf_file settings/ours-WikiElec-none.json
     ```
 
-    - run the project with HPO on WikiElec
+    - run the project on WikiElec with HPO
     ```
     ```bash
     wandb sweep yamls/WikiElect_sweep.yaml
     # wandb's sweep_ID is generated
 
-    # parallel runs accross different terminal window
+    # parallel runs accross different terminal windows
     # In terminal window 1
     CUDA_VISIBLE_DEVICES=0 wandb agent sweep_ID
     # In terminal window 2
