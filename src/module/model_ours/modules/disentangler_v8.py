@@ -13,31 +13,20 @@ class Disentangler(nn.Module):
         self.comp_len = comp_len
         self.comp_dim = comp_dim
         self.encode_layer_norm = nn.LayerNorm(embed_dim)
+        self.encode_final_layer_norm = nn.LayerNorm(comp_len * comp_dim)
         self.decode_norm = nn.LayerNorm(comp_dim)
         self.scga = ScatterAndGather(args, embed_dim)
-        channels = 2
-        kernel_size = 16
-        self.channels = channels
-        self.kernel_size = kernel_size
-        self.conv = nn.Sequential(
-            nn.Conv2d(channels, channels, kernel_size, kernel_size),
-            nn.GELU(),
-            # nn.Dropout(0.5),
-        )
-        self.deconv = nn.Sequential(
-            nn.ConvTranspose2d(channels, channels, kernel_size, kernel_size),
-            nn.GELU(),
-            # nn.Dropout(0.5),
-        )
         self.node_comp_mlps = nn.Sequential(
-            nn.Linear(args.num_nodes, (kernel_size * comp_len * comp_dim) // channels),
+            nn.Linear(embed_dim, self.comp_dim * 2),
             nn.GELU(),
-            # nn.Dropout(0.5),
+            nn.Dropout1d(0.1),
+            nn.Linear(self.comp_dim * 2, self.comp_dim),
         )
         self.node_decomp_mlps = nn.Sequential(
-            nn.Linear((kernel_size * comp_len * comp_dim) // channels, args.num_nodes),
+            nn.Linear(self.comp_dim, self.comp_dim * 2),
             nn.GELU(),
-            # nn.Dropout(0.5),
+            nn.Dropout1d(0.1),
+            nn.Linear(self.comp_dim * 2, embed_dim),
         )
         self.ortho_loss = torch.zeros(1).squeeze(0).float().to(args.device)
 
@@ -69,19 +58,19 @@ class Disentangler(nn.Module):
             time_entirenodes_emdim,
             is_mlp=False,
         )
-        if self.training:
-            time_entirenodes_emdim = time_entirenodes_emdim[
-                :, torch.randperm(time_entirenodes_emdim.size(1)), :
-            ]
-        time_entirenodes_emdim = time_entirenodes_emdim.transpose(1, 2).reshape(
-            time_entirenodes_emdim.shape[0], self.channels, self.kernel_size, -1
-        )
-        time_entirenodes_emdim = self.node_comp_mlps(time_entirenodes_emdim)
-        compressed_x = (
-            self.conv(time_entirenodes_emdim)
-            .transpose(1, 2)
-            .reshape(time_entirenodes_emdim.shape[0], 1, -1)
-        )
+
+        entire_indices = np.arange(time_entirenodes_emdim.shape[1])
+        # shuffle 하면 test AUC 0.6 이 한계, shuffle 안하면 0.7 가능.
+        # if self.training:
+        #    np.random.shuffle(entire_indices)
+        self.indices_history = np.array_split(entire_indices, self.comp_len)
+        for i, indices in enumerate(self.indices_history):
+            compressed_x_list.append(
+                self.node_comp_mlps(time_entirenodes_emdim[:, indices, :]).sum(
+                    1, keepdim=True
+                )
+            )
+        compressed_x = self.encode_final_layer_norm(torch.cat(compressed_x_list, dim=2))
 
         return compressed_x
 
@@ -92,12 +81,15 @@ class Disentangler(nn.Module):
         x: torch.Tensor
             [#timestamps, #tokens (node + edge), embed_dim]
         """
-        last_dim = (self.comp_len * self.comp_dim) // self.channels
-        x = x.reshape(x.shape[0], 1, self.channels, last_dim).transpose(1, 2)
-        x = self.deconv(x)
-        x = self.node_decomp_mlps(x)
-        time_entirenodes_emdim = x.reshape(x.shape[0], self.embed_dim, -1).transpose(
-            1, 2
+        time_entirenodes_emdim = torch.zeros(
+            x.shape[0], self.args.num_nodes, self.comp_dim, device=x.device
+        )
+        for indices, tensor in zip(
+            self.indices_history, torch.split(x, self.comp_dim, dim=2)
+        ):
+            time_entirenodes_emdim[:, indices, :] += tensor
+        time_entirenodes_emdim = self.node_decomp_mlps(
+            self.decode_norm(time_entirenodes_emdim)
         )
 
         time_tokens_emdim = torch.zeros(

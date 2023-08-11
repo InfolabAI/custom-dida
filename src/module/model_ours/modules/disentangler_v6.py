@@ -18,23 +18,21 @@ class Disentangler(nn.Module):
         self.scga = ScatterAndGather(args, embed_dim)
         self.node_comp_mlps = nn.ModuleList(
             {
-                # nn.Sequential(
-                #    nn.Linear(embed_dim, self.comp_dim * 2),
-                #    nn.GELU(),
-                #    nn.Dropout1d(0.1),
-                #    nn.Linear(self.comp_dim * 2, self.comp_dim),
-                # )
-                nn.AdaptiveAvgPool1d(comp_dim)
-                for _ in range(comp_len)
+                nn.Sequential(
+                    nn.Linear(embed_dim, self.comp_dim * 2),
+                    nn.GELU(),
+                    nn.Dropout1d(0.1),
+                    nn.Linear(self.comp_dim * 2, self.comp_dim),
+                )
+                for _ in range(self.comp_len)
             }
         )
-        self.node_decomp_mlps = nn.AdaptiveAvgPool1d(embed_dim)
-        # nn.Sequential(
-        #    nn.Linear(self.comp_dim, self.comp_dim * 2),
-        #    nn.GELU(),
-        #    nn.Dropout1d(0.1),
-        #    nn.Linear(self.comp_dim * 2, embed_dim),
-        # )
+        self.node_decomp_mlps = nn.Sequential(
+            nn.Linear(self.comp_dim, self.comp_dim * 2),
+            nn.GELU(),
+            nn.Dropout1d(0.1),
+            nn.Linear(self.comp_dim * 2, embed_dim),
+        )
         self.ortho_loss = torch.zeros(1).squeeze(0).float().to(args.device)
 
     def encode(
@@ -68,7 +66,7 @@ class Disentangler(nn.Module):
 
         entire_indices = np.arange(time_entirenodes_emdim.shape[1])
         # shuffle 하면 test AUC 0.6 이 한계, shuffle 안하면 0.7 가능
-        # if self.training
+        # if self.training:
         #    np.random.shuffle(entire_indices)
         self.indices_history = np.array_split(entire_indices, self.comp_len)
         for i, indices in enumerate(self.indices_history):

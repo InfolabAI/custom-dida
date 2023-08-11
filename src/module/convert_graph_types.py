@@ -239,8 +239,8 @@ class ConvertGraphTypes:
         )
         graph.ndata["X"] = node_features
 
-        graph = graph.remove_self_loop()
         graph.remove_edges(indices_to_be_removed)
+        graph = graph.remove_self_loop()
         # graph = dgl.to_simple(graph)
 
         return graph

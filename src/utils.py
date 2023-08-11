@@ -33,14 +33,18 @@ def sparse_diag(input):
     return torch.sparse_coo_tensor(indices, input, (N, N))
 
 
-def sparse_filter(input, eps):
+def sparse_filter(input, eps, keep_size=False):
     input = input.coalesce()
     indices = input.indices()
     values = input.values()
     idx = torch.where(values > eps, True, False)
     indices = indices[:, idx]
     values = values[idx]
-    return torch.sparse_coo_tensor(indices, values)
+    logger.info(f"edges removed: {input.values().shape[0] - values.shape[0]}")
+    if keep_size:
+        return torch.sparse_coo_tensor(indices, values, size=input.size())
+    else:
+        return torch.sparse_coo_tensor(indices, values)
 
 
 def graph_to_normalized_adjacency(graph):
@@ -58,6 +62,14 @@ def weighted_adjacency_to_graph(adj):
     graph = dgl.graph((indices[0, :], indices[1, :]))
     graph.edata["w"] = adj.values()
     return graph
+
+
+def normalize(At):
+    values = At.coalesce().values()
+    min_val = values.min()
+    max_val = values.max()
+    values = (values - min_val) / (max_val - min_val)
+    return torch.sparse_coo_tensor(At.coalesce().indices(), values, At.shape)
 
 
 def normalize_graph(graph, ord="sym"):

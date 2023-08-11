@@ -7,6 +7,7 @@ from ..convert_graph_types import ConvertGraphTypes
 from .modules.scatter_and_gather import ScatterAndGather
 from .modules.model_tokengt import TokenGTModel
 from ..utils_main import MultiplyPredictor
+from utils import sparse_filter, normalize
 
 # from model_ours.modules.sample_nodes import SampleNodes
 from .modules.sample_nodes_reduced import SampleNodes
@@ -40,22 +41,24 @@ class GeneratePool:
     def generate(self, list_of_dgl_graphs):
         new_At_list = []
         new_At = None
-        for graph in list_of_dgl_graphs:
+        for i, graph in enumerate(list_of_dgl_graphs):
             At = graph.adj()
             At = torch.sparse_coo_tensor(
                 At.indices(), At.val, At.shape, device=At.device
             )
+
             if new_At is None:
                 new_At = At
             else:
                 if self.args.dataset == "RedditBody":
-                    new_At = At + new_At
-                else:
-                    new_At = At + At.matmul(new_At)
+                    new_At = sparse_filter(new_At, 0.001, keep_size=True)
+                new_At = At + At.matmul(new_At)
+                new_At = normalize(new_At)
+                # new_At = At + new_At
 
-            # logger.info(
-            #     f"newAt #edges(newAt/At), newAt #nodes(newAt/At): {new_At.coalesce().values().shape[0]}({new_At.coalesce().values().shape[0]/At.coalesce().values().shape[0]:.2f}) , {new_At.coalesce().indices().unique().shape[0]}({new_At.coalesce().indices().unique().shape[0]/At.coalesce().indices().unique().shape[0]:.2f})"
-            # )
+            logger.info(
+                f"newAt #edges(newAt/At), newAt #nodes(newAt/At): {new_At.coalesce().values().shape[0]}({new_At.coalesce().values().shape[0]/At.coalesce().values().shape[0]:.2f}) , {new_At.coalesce().indices().unique().shape[0]}({new_At.coalesce().indices().unique().shape[0]/At.coalesce().indices().unique().shape[0]:.2f})"
+            )
             new_At_list.append(new_At)
 
         return new_At_list
