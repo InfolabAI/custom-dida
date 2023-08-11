@@ -50,7 +50,7 @@
     wandb sweep yamls/WikiElect_sweep.yaml
     # wandb's sweep_ID is generated
 
-    # parallel runs accross different terminal windows
+    # parallel runs for multi-GPUs by using different terminal windows
     # In terminal window 1
     CUDA_VISIBLE_DEVICES=0 wandb agent sweep_ID
     # In terminal window 2
