@@ -31,45 +31,32 @@
 - numpy == 1.25.1
 
 ## Datasets
-- COLLAB and Yelp
-    - Download dataset at `./data` from following links
-        ```bash
-        https://drive.google.com/file/d/19SOqzYEKvkna6DKd74gcJ50Wd4phOHr3/view?usp=share_link
-        ```
-- BitcoinAlpha, WikiElec and RedditBody
-    - Run following commands
-        ```bash
-        python ./dataset_loader/preprocess_dgl_brw.py # Download dataset, produce DGL graphs and save DGL graphs as pt files to fix node features
-        python ./dataset_loader/preprocess_dict_from_dgl.py # Produce dictionaries from DGL graphs, and save dictionaries as pt files becuase we need to fix negative edges for test
-        ```
+- Datasets are automatically downloaded and preprocessed
 
 ## Usage
-- Check args.log_dir in `config.py`
-- Run the project
-    - **Option 1** - Use `main.py` directly, for example:
-        ```bash
-        # Our method with node propagation 
-        python main.py --model ours --seed 123 --device_id 0 --propagate inneraug --dataset collab --ex_name "aa"
-
-        # DIDA
-        python main.py --model dida --seed 123 --device_id 0 --dataset collab --ex_name "Dynamic aug"
-        ```
-    - **Option 2** - Use `script.sh`
-        ```bash
-        bash script.sh
-        # Then, check the log folder <args.log_dir>/<args.ex_name>/* for this run
-
-        # To check logs, move the log folder to <TENSORBOARD FOLDER> and run tensorboard
-        tensorboard --logdir <TENSORBOARD FOLDER> --port <PORT>
-
-        # Check the logs in tensorboard
-        ```
-- After running the project, if you want to group the results from multiple runs to get the mean values, run following command
+- Check `settings/ours-WikiElec-none.json` which means `<method>-<dataset>-<augmentation_method>.json` and defines fixed configurations searched by wandb's hyperparameter optimization (HPO)
+- Check `yamls/WikiElec_sweep.yaml` which defines sweep configuration to perform wandb's HPO
+- Create wandb's account and initialize your project by following [Quickstart](https://docs.wandb.ai/quickstart)
+- Run wandb's sweep by following [Define sweep configuration](https://docs.wandb.ai/guides/sweeps/define-sweep-configuration), [Initialize sweeps](https://docs.wandb.ai/guides/sweeps/initialize-sweeps) and [Start sweep agents](https://docs.wandb.ai/guides/sweeps/start-sweep-agents)
+- Example
+    - run the project without HPO on WikiElec
     ```bash
-    # We assume that <LOG_PATH> has multiple runs with different seeds
-    python group_multiple_runs.py <LOG_PATH>
-
-    # Check <LOG_PATH>/combined_<RUN NAME>
+    python src/main.py --conf_file settings/ours-WikiElec-none.json
     ```
 
+    - run the project with HPO on WikiElec
+    ```
+    ```bash
+    wandb sweep yamls/WikiElect_sweep.yaml
+    # wandb's sweep_ID is generated
+
+    # parallel runs accross different terminal window
+    # In terminal window 1
+    CUDA_VISIBLE_DEVICES=0 wandb agent sweep_ID
+    # In terminal window 2
+    CUDA_VISIBLE_DEVICES=1 wandb agent sweep_ID
+    # In terminal window 3
+    CUDA_VISIBLE_DEVICES=2 wandb agent sweep_ID
+    ...
+    ```
 ## Paper
