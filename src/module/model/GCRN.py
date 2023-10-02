@@ -473,6 +473,27 @@ class GConvLSTM(torch.nn.Module):
             * **H** *(PyTorch Float Tensor)* - Hidden state matrix for all nodes.
             * **C** *(PyTorch Float Tensor)* - Cell state matrix for all nodes.
         """
+        breakpoint()
+        """
+        (Pdb) p X.shape
+        torch.Size([7125, 32])
+        (Pdb) p H.shape
+        torch.Size([7125, 32])
+        (Pdb) p C.shape
+        torch.Size([7125, 32])
+        (Pdb) p I.shape
+        torch.Size([7125, 32])
+        (Pdb) p F.shape
+        torch.Size([7125, 32])
+        (Pdb) p O.shape
+        torch.Size([7125, 32])
+        (Pdb) p H.shape
+        torch.Size([7125, 32])
+        (Pdb) p edge_index.shape
+        torch.Size([2, 7227])
+        (Pdb) p edge_weight.shape
+        torch.Size([7227])
+        """
         H = self._set_hidden_state(X, H)
         C = self._set_cell_state(X, C)
         I = self._calculate_input_gate(X, edge_index, edge_weight, H, C)

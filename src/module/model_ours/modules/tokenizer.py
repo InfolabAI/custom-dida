@@ -34,6 +34,15 @@ class GraphFeatureTokenizer(nn.Module):
 
         self.apply(lambda module: init_params(module, n_layers=n_layers))
 
+        self.orf_encoder = nn.Linear(2 * hidden_dim, hidden_dim, bias=False)
+        # from orf.py
+        self.orf, r = torch.linalg.qr(
+            torch.randn((10, args.num_nodes, hidden_dim), device=args.device),
+            mode="reduced",
+        )
+
+        self.step = 0
+
     @staticmethod
     def get_batch(
         node_feature, edge_index, edge_feature, node_num, edge_num, perturb=None
@@ -50,7 +59,7 @@ class GraphFeatureTokenizer(nn.Module):
         seq_len = [n + e for n, e in zip(node_num, edge_num)]
         b = len(seq_len)
         d = node_feature.size(-1)
-        max_len = max(seq_len) + 1
+        max_len = max(seq_len)
         max_n = max(node_num)
         device = edge_index.device
 
@@ -109,6 +118,22 @@ class GraphFeatureTokenizer(nn.Module):
             padded_node_mask,
             padded_edge_mask,
         )
+
+    @staticmethod
+    @torch.no_grad()
+    def get_node_mask(node_num, device):
+        b = len(node_num)
+        max_n = max(node_num)
+        node_index = torch.arange(max_n, device=device, dtype=torch.long)[
+            None, :
+        ].expand(
+            b, max_n
+        )  # [B, max_n]
+        node_num = torch.tensor(node_num, device=device, dtype=torch.long)[
+            :, None
+        ]  # [B, 1]
+        node_mask = torch.less(node_index, node_num)  # [B, max_n]
+        return node_mask
 
     @staticmethod
     @torch.no_grad()
@@ -182,6 +207,8 @@ class GraphFeatureTokenizer(nn.Module):
 
         node_feature = node_data
         edge_feature = edge_data
+        device = node_feature.device
+        dtype = node_feature.dtype
 
         (
             # padded_index: source node index 와 target node index 를 가짐(서로 같으면 node, 다르면 edge)
@@ -193,6 +220,35 @@ class GraphFeatureTokenizer(nn.Module):
         ) = self.get_batch(
             node_feature, edge_index, edge_feature, node_num, edge_num, perturb
         )
+        node_mask = self.get_node_mask(
+            node_num, node_feature.device
+        )  # [B, max(n_node)]
+
+        """
+        ORF 를 token 에 할당하는 방법 분석
+        1. self.get_index_embed 의 input 인 orf_node_id 의 의미
+            - 각 subgraph 의 각 node identifier features 의 순차적인 집합이다.
+            - 즉 [sum(#nodes), embed_dim] 이고, sum(#nodes) = #nodes of subgraph 1 + #nodes of subgraph 2 + ... + #nodes of subgraph n 이다.
+        2. padded_index 의 의미
+            - dim 은 [#subgraphs, #tokens, 2] 인데, 예를 들면 padded_index[0] 은 ... [2373, 2373], [2374, 2374], [   1,  428], [   1,  104] ... 이고, [src node id, dst node id] 를 의미한다.
+            - 즉, 값이 같으면 node 또는 pad 이고, 다르면 edge 이고, 이를 통해 node 에 대해서는 같은 node identifier features 를 더하고, edge 에 대해서는 다른 node identifier features 를 더한다.
+        3. 2개의 node identifier features 를 합치는 방법
+            - 각 32개 씩 총 64개의 dim 을 가지는데, 어떻게 더해서 32로 compress 할 것인지를 self.orf_encoder 가 학습한다.
+        """
+        # apply orf id
+        orf_id_list = []
+        for id_tensor in indices_subnodes:
+            orf_id_list.append(self.orf[self.step % 10][id_tensor])
+
+        self.step += 1
+
+        # [sum(#nodes), embed_dim]
+        orf_node_id = torch.concat(orf_id_list, dim=0)
+        orf_node_id = F.normalize(orf_node_id, p=2, dim=1)
+        # [sum(#nodes), embed_dim] -> [#subgraphs, #tokens, 2*embed_dim]
+        orf_embed = self.get_index_embed(orf_node_id, node_mask, padded_index)
+        # [#subgraphs, max(#nodes), 2*embed_dim] -> [#subgraphs, max(#nodes), embed_dim]
+        padded_feature = padded_feature + self.orf_encoder(orf_embed)
 
         # apply type id
         padded_feature = padded_feature + self.get_type_embed(padded_index)

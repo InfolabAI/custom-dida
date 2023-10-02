@@ -1,4 +1,5 @@
 import torch
+import time
 import torch.nn as nn
 import copy
 
@@ -7,31 +8,11 @@ from ..convert_graph_types import ConvertGraphTypes
 from .modules.scatter_and_gather import ScatterAndGather
 from .modules.model_tokengt import TokenGTModel
 from ..utils_main import MultiplyPredictor
-from utils import sparse_filter, normalize
+from utils import sparse_filter, normalize, sparse_filter_by_ratio
+from module.utils_main import get_gpu_memory_usage
 
 # from model_ours.modules.sample_nodes import SampleNodes
 from .modules.sample_nodes_reduced import SampleNodes
-
-
-class ORFApplier(nn.Module):
-    def __init__(self, args, hidden_dim):
-        super().__init__()
-        self.orf_encoder = nn.Linear(hidden_dim * 2, hidden_dim, bias=False)
-
-        # from orf.py
-        q, r = torch.linalg.qr(
-            torch.randn((10, args.num_nodes, hidden_dim * 2), device=args.device),
-            mode="reduced",
-        )
-        # [1, num_entire_nodes, hidden_dim] -> [num_entire_nodes, hidden_dim]
-        self.orf = torch.nn.functional.normalize(q, p=2, dim=2).to(args.device)
-
-        self.step = 0
-
-    def forward(self, x):
-        x = x + self.orf_encoder(self.orf[self.step % 10])
-        self.step += 1
-        return x
 
 
 class GeneratePool:
@@ -50,10 +31,11 @@ class GeneratePool:
             if new_At is None:
                 new_At = At
             else:
-                if self.args.dataset == "RedditBody":
-                    new_At = sparse_filter(new_At, 0.001, keep_size=True)
-                new_At = At + At.matmul(new_At)
-                new_At = normalize(new_At)
+                new_At = At.matmul(new_At)
+                new_At = sparse_filter_by_ratio(
+                    At, new_At, self.args.edgeprop_ratio, keep_size=True
+                )
+                new_At = At + normalize(new_At)
                 # new_At = At + new_At
 
             logger.info(
@@ -72,6 +54,8 @@ class OurModel(nn.Module):
         self.args = args
         self.cgt = ConvertGraphTypes()
         self.gp = GeneratePool(args)
+        self._sync_graphs(_kwargs["graphs"])
+        # TODO propgated edge 로 graph 교체
         self.tr_input_pool = self.cgt.dglG_list_to_pool(
             self._get_graphs_for_pool(_kwargs["graphs"])
         )
@@ -80,16 +64,31 @@ class OurModel(nn.Module):
 
         self.main_model = TokenGTModel.build_model(args).to(args.device)
         self.sample_nodes = SampleNodes(args)
-        self.orf_applier = ORFApplier(args, args.encoder_embed_dim)
         self.scatter_and_gather = ScatterAndGather(args, args.encoder_embed_dim)
         self.cs_decoder = MultiplyPredictor()
 
         self.tr_input_pool = None
         self.tr_input = None
 
+    def _sync_graphs(self, dataset):
+        """
+        - graphs 의 ndata 를 input_graphs 로 옮김
+        - self_loop 을 제거
+        - edata 를 [#edges, 1] -> [#edges, #embed_dim] 로 변경
+        - graphs 를 input_graphs 로 변경"""
+        for i in range(len(dataset)):
+            dataset.input_graphs[i].ndata["X"] = dataset.graphs[i].ndata["X"]
+            dataset.input_graphs[i] = dataset.input_graphs[i].remove_self_loop()
+            dataset.input_graphs[i].edata["w"] = (
+                dataset.input_graphs[i]
+                .edata["w"]
+                .reshape(-1, 1)
+                .broadcast_to(-1, dataset.input_graphs[0].ndata["X"].shape[1])
+            )
+            dataset.graphs[i] = dataset.input_graphs[i]
+
     def _get_graphs_for_pool(self, list_of_dgl_graphs):
-        """(DEPRECATED)
-        한번에 모든 t에 대해 propagated graph 를 구하는 함수"""
+        """한번에 모든 t에 대해 propagated graph 를 구하는 함수"""
         new_At_list = self.gp.generate(list_of_dgl_graphs)
 
         list_of_dgl_graphs_for_pool = []
@@ -106,16 +105,13 @@ class OurModel(nn.Module):
 
     def forward(self, dataset, start, end):
         # logger.debug(f"start: {start}, end: {end}")
-        # 여기서 dataset을 변경하면 안됨. trainer 에서 start, end 계산과 의존성이 있기 때문.
+        # 여기서 dataset 의 graphs 와 input_graphs 의 index 를 변경하면 안됨. trainer 에서 start, end 계산과 의존성이 있기 때문.
         graphs = dataset.graphs[:end]
         sampled_original_indices = None
         graphs = copy.deepcopy(graphs)
 
-        for i in range(len(graphs)):
-            graphs[i].ndata["X"] = self.orf_applier(graphs[i].ndata["X"])
-
-        if self.args.num_division_edgeprop > 0:
-            graphs, sampled_original_indices = self.sample_nodes(graphs)
+        # if self.args.num_division_edgeprop > 0:
+        #    graphs, sampled_original_indices = self.sample_nodes(graphs)
 
         self.tr_input = self.cgt.dglG_list_to_TrInputDict(
             graphs, sampled_original_indices
@@ -138,5 +134,9 @@ class OurModel(nn.Module):
             entire_features=list_[0],
             is_mlp=True,
         )
+
+        assert (
+            get_gpu_memory_usage() < 20
+        ), "현재 process 의 Pytorch 의 메모리 사용량이 20 GB 이상이면 에러"
 
         return features[start:, :, :]

@@ -32,7 +32,7 @@ class TrainerOurs(TrainerAndTester):
         for t in range(train_len):
             z = embeddings[t]
             pos_edge_index = self.prepare(t + 1)[0]
-            neg_edge_index = negative_sampling_(
+            neg_edge_index = negative_sampling(
                 pos=pos_edge_index,
                 num_nodes=args.num_nodes,
                 shift=args.shift,

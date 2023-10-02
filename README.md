@@ -47,7 +47,7 @@
     - Run the project on WikiElec with HPO
     ```
     ```bash
-    wandb sweep yamls/WikiElect_sweep.yaml
+    wandb sweep yamls/WikiElec_sweep.yaml
     # wandb's sweep_ID is generated
 
     # parallel runs for multi-GPUs by using different terminal windows

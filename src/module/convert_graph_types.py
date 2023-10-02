@@ -168,11 +168,9 @@ class ConvertGraphTypes:
         tr_input_pool["node_data"] = subgraph.ndata["X"]
         return tr_input_pool
 
-    def dglG_list_to_TrInputDict(
-        self, list_of_dgl_graphs, sampled_original_indices=None
-    ):
-        device = list_of_dgl_graphs[0].ndata["X"].device
-        comm = self._get_activated_communities(list_of_dgl_graphs)
+    def dglG_list_to_TrInputDict(self, graphs, sampled_original_indices=None):
+        device = graphs[0].ndata["X"].device
+        comm = self._get_activated_communities(graphs)
         tr_input = defaultdict(list)
         node_data_index = 0
         for t, activated_nodes in comm.items():
@@ -187,35 +185,18 @@ class ConvertGraphTypes:
                 )
             else:
                 indices = activated_nodes
-            subgraph = dgl.node_subgraph(list_of_dgl_graphs[t], indices)
+            subgraph = dgl.node_subgraph(graphs[t], indices)
             tr_input["indices_subnodes"].append(torch.Tensor(indices).int())
 
             # t 에서 가져온 subgraph 의 ndata 를 사용하므로 t 마다 ndata 가 달라도 문제없음
             tr_input["node_data"].append(subgraph.ndata["X"])
-
-            ########################
-            ## activated_nodes 에 해당하는 edge 만 사용
-            # subgraph 는 node id 가 subgraph 관점으로 변환되어 있으므로, 원래 node id 로 activated_nodes 인지 여부 파악
-            original_srcids = subgraph.ndata[dgl.NID][subgraph.edges()[0]]
-            srcids_mask = torch.isin(
-                original_srcids, torch.tensor(activated_nodes).to(device)
+            tr_input["edge_data"].append(subgraph.edata["w"])
+            edge_tensor = torch.concat(
+                [subgraph.edges()[0].unsqueeze(0), subgraph.edges()[1].unsqueeze(0)]
             )
-            original_dstids = subgraph.ndata[dgl.NID][subgraph.edges()[1]]
-            dstids_mask = torch.isin(
-                original_dstids, torch.tensor(activated_nodes).to(device)
-            )
-
-            srcids = subgraph.edges()[0][srcids_mask & dstids_mask]
-            dstids = subgraph.edges()[1][srcids_mask & dstids_mask]
-
-            # node i, j 의 feature 를 연산하여 edge feature 로 사용
-            tr_input["edge_data"].append(
-                subgraph.ndata["X"][srcids] * subgraph.ndata["X"][dstids]
-            )
-            edge_tensor = torch.concat([srcids.unsqueeze(0), dstids.unsqueeze(0)])
             tr_input["edge_index"].append(edge_tensor)
             tr_input["node_num"].append(subgraph.num_nodes())
-            tr_input["edge_num"].append(srcids.shape[0])
+            tr_input["edge_num"].append(edge_tensor.shape[1])
 
         tr_input["node_data"] = torch.concat(tr_input["node_data"])
         tr_input["edge_data"] = torch.concat(tr_input["edge_data"])
@@ -231,6 +212,7 @@ class ConvertGraphTypes:
         """
         adj = adj.coalesce()
         indices = adj.indices()
+        values = adj.values()
         # 0 value 인 edge 모두 제거하도록 indices 추출
         indices_to_be_removed = torch.where(adj.values() == 0)[0]
 
@@ -238,6 +220,9 @@ class ConvertGraphTypes:
             (indices[0, :], indices[1, :]), num_nodes=node_features.shape[0]
         )
         graph.ndata["X"] = node_features
+        graph.edata["w"] = (
+            adj.values().reshape(-1, 1).broadcast_to(-1, node_features.shape[1])
+        )
 
         graph.remove_edges(indices_to_be_removed)
         graph = graph.remove_self_loop()

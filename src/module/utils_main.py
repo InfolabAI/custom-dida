@@ -30,15 +30,26 @@ def preprocess_data_per_run(args, data):
     return data
 
 
-def get_gpu_memory_usage(device_id):
-    result = subprocess.run(
-        ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,nounits,noheader"],
-        capture_output=True,
-        text=True,
-    )
-    output = result.stdout.strip()
-    memory_usage = [int(x) for x in output.split("\n")]
-    return memory_usage[int(device_id)]
+# def get_gpu_memory_usage(device_id):
+#     result = subprocess.run(
+#         ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,nounits,noheader"],
+#         capture_output=True,
+#         text=True,
+#     )
+#     output = result.stdout.strip()
+#     memory_usage = [int(x) for x in output.split("\n")]
+#     return memory_usage[int(device_id)]
+
+
+def get_gpu_memory_usage():
+    """
+    Return allocated memory in GB"""
+    if torch.cuda.is_available():
+        gpu_id = torch.cuda.current_device()
+        gpu_memory_allocated = torch.cuda.memory_allocated(gpu_id)
+        return gpu_memory_allocated / 1024**3
+    else:
+        return 0
 
 
 def get_current_datetime():

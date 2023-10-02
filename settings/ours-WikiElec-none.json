@@ -12,6 +12,7 @@
   "encoder_attention_heads": 16,
   "tau": 0.1,
   "num_division_edgeprop": 3,
+  "edgeprop_ratio": 1.5,
   "featureprop": {
     "version": 7,
     "time_att_0d_dropout": 0.78,

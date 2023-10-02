@@ -1,3 +1,4 @@
+# the differnce from v5  is that v6 use nn.Sequential models in mlp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

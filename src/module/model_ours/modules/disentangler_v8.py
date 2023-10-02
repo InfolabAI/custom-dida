@@ -1,3 +1,4 @@
+# the difference from v6 is that v8 uses only one mlp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

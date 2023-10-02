@@ -15,7 +15,6 @@ from .disentangler_v5 import Disentangler as DV5
 from .disentangler_v6 import Disentangler as DV6
 from .disentangler_v7 import Disentangler as DV7
 from .disentangler_v8 import Disentangler as DV8
-from .disentangler_v9 import Disentangler as DV9
 
 disentabler_dict = {
     1: DV1,
@@ -26,7 +25,6 @@ disentabler_dict = {
     6: DV6,
     7: DV7,
     8: DV8,
-    9: DV9,
 }
 
 
