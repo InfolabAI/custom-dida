@@ -19,23 +19,22 @@ from .droppath import DropPath
 class TokenGTGraphEncoderLayer(nn.Module):
     def __init__(
         self,
-        embedding_dim: int = 768,
-        ffn_embedding_dim: int = 3072,
-        encoder_layers: int = 12,
-        num_attention_heads: int = 8,
-        dropout: float = 0.1,
-        attention_dropout: float = 0.1,
+        embedding_dim: int = 32,
+        ffn_embedding_dim: int = 32,
+        num_attention_heads: int = 16,
+        dropout: float = 0.0,
+        attention_dropout: float = 0.0,
         activation_dropout: float = 0.1,
-        drop_path: float = 0.0,
-        performer: bool = False,
+        drop_path: float = 0.02,
+        performer: bool = True,
         performer_nb_features: int = None,
         performer_generalized_attention: bool = False,
-        activation_fn: str = "relu",
+        activation_fn: str = "gelu",
         export: bool = False,
         q_noise: float = 0.0,
         qn_block_size: int = 8,
         init_fn: Callable = None,
-        layernorm_style: str = "postnorm",
+        layernorm_style: str = "prenorm",
         return_attention: bool = False,
     ) -> None:
         super().__init__()
@@ -46,7 +45,6 @@ class TokenGTGraphEncoderLayer(nn.Module):
         # Initialize parameters
         self.embedding_dim = embedding_dim
         self.ffn_embedding_dim = ffn_embedding_dim
-        self.encoder_layers = encoder_layers
         self.num_attention_heads = num_attention_heads
         self.attention_dropout = attention_dropout
         self.q_noise = q_noise
@@ -73,10 +71,12 @@ class TokenGTGraphEncoderLayer(nn.Module):
         )
 
         # layer norm associated with the self attention layer
-        self.self_attn_layer_norm = LayerNorm(self.embedding_dim, export=export)
+        self.self_attn_layer_norm = LayerNorm(
+            self.embedding_dim, export=export)
 
         # drop path for stochastic depth
-        self.drop_path1 = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+        self.drop_path1 = DropPath(
+            drop_path) if drop_path > 0.0 else nn.Identity()
 
         self.feedforward = self.build_FFN(
             self.embedding_dim,
@@ -93,7 +93,8 @@ class TokenGTGraphEncoderLayer(nn.Module):
         self.final_layer_norm = LayerNorm(self.embedding_dim, export=export)
 
         # drop path for stochastic depth
-        self.drop_path2 = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+        self.drop_path2 = DropPath(
+            drop_path) if drop_path > 0.0 else nn.Identity()
 
     def build_FFN(
         self,
@@ -220,4 +221,4 @@ class TokenGTGraphEncoderLayer(nn.Module):
 
         else:
             raise NotImplementedError
-        return x, attn
+        return x

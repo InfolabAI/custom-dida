@@ -1,6 +1,8 @@
-import os, json
+import os
+import json
 import torch
-import dataset_loader, module
+import dataset_loader
+import module
 import wandb
 from fire import Fire
 from loguru import logger
@@ -153,7 +155,8 @@ def main(
 
     # build augmenter
 
-    tiara_argments = (alpha, beta, eps, K, symmetric_trick, device, dense, verbose)
+    tiara_argments = (alpha, beta, eps, K, symmetric_trick,
+                      device, dense, verbose)
 
     if augment_method == "tiara":
         augment_method = augmenter.Tiara(*tiara_argments)
@@ -162,7 +165,8 @@ def main(
     elif augment_method == "none":
         augment_method = augmenter.GCNNorm(device)
     else:
-        raise NotImplementedError("no such augmenter {}".format(augment_method))
+        raise NotImplementedError(
+            "no such augmenter {}".format(augment_method))
 
     dataset.input_graphs = augment_method(dataset)
 
@@ -175,6 +179,7 @@ def main(
         "graphs": dataset,
         **kwargs,
     }
+    kwargs["args"].num_nodes = dataset.num_nodes
 
     if augment_method == "tiara" and not symmetric_trick:
         model_arguments["renorm_order"] = "row"
@@ -185,9 +190,12 @@ def main(
     elif model == "GCRN":
         model = module.GCRN(**model_arguments)
     elif model == "EvolveGCN":
-        model = module.EvolveGCN(num_nodes=dataset.num_nodes, **model_arguments)
+        model = module.EvolveGCN(
+            num_nodes=dataset.num_nodes, **model_arguments)
     elif model == "ours":
         model = module.OurModel(**model_arguments).to(kwargs["args"].device)
+    elif model == "TRRN":
+        model = module.TRRN(**model_arguments).to(kwargs["args"].device)
     else:
         raise NotImplementedError("no such model {}".format(model))
 
@@ -198,7 +206,8 @@ def main(
         lossfn = module.PairLoss()
         evaluator = AUCMetric()
     elif isinstance(dataset, NodeDatasetTemplate):
-        decoder = module.NodeDecoder(output_dim, decoder_dim, dataset.num_label, device)
+        decoder = module.NodeDecoder(
+            output_dim, decoder_dim, dataset.num_label, device)
         lossfn = module.NodeLoss()
         evaluator = F1Metric(dataset.num_label)
     else:

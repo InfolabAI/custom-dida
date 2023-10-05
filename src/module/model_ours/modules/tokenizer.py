@@ -184,7 +184,8 @@ class GraphFeatureTokenizer(nn.Module):
         :param padded_index: LongTensor([B, T, 2])
         :return: Tensor([B, T, D])
         """
-        order = torch.eq(padded_index[..., 0], padded_index[..., 1]).long()  # [B, T]
+        order = torch.eq(padded_index[..., 0],
+                         padded_index[..., 1]).long()  # [B, T]
         order_embed = self.order_encoder(order)
         return order_embed
 
@@ -238,7 +239,8 @@ class GraphFeatureTokenizer(nn.Module):
         # apply orf id
         orf_id_list = []
         for id_tensor in indices_subnodes:
-            orf_id_list.append(self.orf[self.step % 10][id_tensor])
+            orf_id_list.append(self.orf[self.step %
+                               10][id_tensor].unsqueeze(0))
 
         self.step += 1
 
@@ -254,7 +256,8 @@ class GraphFeatureTokenizer(nn.Module):
         padded_feature = padded_feature + self.get_type_embed(padded_index)
 
         # pad 에 대해 0으로 만드는 부분
-        padded_feature = padded_feature.masked_fill(padding_mask[..., None], float("0"))
+        padded_feature = padded_feature.masked_fill(
+            padding_mask[..., None], float("0"))
 
         return (
             padded_feature,

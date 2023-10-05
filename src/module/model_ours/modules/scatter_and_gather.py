@@ -18,7 +18,7 @@ class ScatterAndGather(nn.Module):
         self.mlp_d = nn.Sequential(
             nn.Linear(embed_dim, 2 * embed_dim),
             nn.GELU(),
-            nn.Dropout1d(0.5),
+            # nn.Dropout1d(0.5),
             nn.Linear(2 * embed_dim, comp_dim),
         )
         self.layer_norm_u = nn.LayerNorm(comp_dim)
@@ -31,55 +31,32 @@ class ScatterAndGather(nn.Module):
 
     def _to_entire(
         self,
-        x,
-        total_node_num,
+        x_list,
         total_indices_subnodes,
         graphs,
-        entire_features=None,
-        is_mlp=True,
     ):
-        offset = 0
         t_entire_embeddings = []
-        ta_nonzero, ta_mean, bd_mean = 0, 0, 0
-        for t, (node_num, activated_indices) in enumerate(
-            zip(total_node_num, total_indices_subnodes)
+        for t, (x, activated_indices) in enumerate(
+            zip(x_list, total_indices_subnodes)
         ):
             # t_activated_embedding.size == [#nodes at t, embed_dim]
             t_activated_embedding = scatter(
                 # [#activated nodes at t, embed_dim]
-                x[offset : offset + node_num],
+                x,
                 activated_indices.long().to(self.args.device),
                 dim=0,
                 dim_size=self.args.num_nodes,
                 reduce="add",
             )
-            offset += node_num
 
             ta = t_activated_embedding
             bd = graphs[t].ndata["X"]
 
-            ta_nonzero += ta.mean(1).nonzero().size(0)
-            ta_mean += ta.abs().mean()
-            bd_mean += bd.abs().mean()
-
             input_ = ta + bd
-
-            t_embedding = self.mlp_d(self.layer_norm_d(input_)) if is_mlp else input_
-
+            t_embedding = self.mlp_d(self.layer_norm_d(input_))
             t_entire_embeddings.append(t_embedding)
 
-        # logger.info(
-        #     f"ta_nonzero: {ta_nonzero}, ta_mean: {ta_mean:.2f}, bd_mean: {bd_mean:.2f}"
-        # )
         ret = torch.stack(t_entire_embeddings, dim=0)
-        if entire_features is not None:
-            ret = ret + entire_features
-            logger.info(
-                f"ret: {ret.abs().mean():.2f} entire_features: {entire_features.abs().mean():.2f}"
-            )
-        # else:
-        #    pass
-        #    # logger.info("entire_features is None")
         return ret
 
     def _from_entire(self, x, batched_data):

@@ -98,7 +98,8 @@ class ConvertGraphTypes:
             source_node = int(source_nodes[i].numpy())
             dest_node = int(dest_nodes[i].numpy())
             graph.add_edge(
-                source_node, dest_node, w=edge_weights[(source_node, dest_node)]
+                source_node, dest_node, w=edge_weights[(
+                    source_node, dest_node)]
             )
 
         return graph
@@ -150,7 +151,8 @@ class ConvertGraphTypes:
                 .t()
             )
 
-            dglG = dgl.graph((edge_tensor[0], edge_tensor[1]), num_nodes=num_nodes)
+            dglG = dgl.graph(
+                (edge_tensor[0], edge_tensor[1]), num_nodes=num_nodes)
             dglG.ndata["X"] = node_features
             dglG.edata["w"] = edge_features
             list_of_dgl_graphs.append(dglG.to(device))
@@ -160,25 +162,26 @@ class ConvertGraphTypes:
     def dglG_list_to_pool(self, list_of_dgl_graphs):
         comm = self._get_activated_communities(list_of_dgl_graphs)
         new_node_indices = np.unique(
-            np.concatenate([activated_nodes for t, activated_nodes in comm.items()])
+            np.concatenate(
+                [activated_nodes for t, activated_nodes in comm.items()])
         )
         tr_input_pool = defaultdict(list)
-        tr_input_pool["indices_subnodes"] = torch.Tensor(new_node_indices).int()
+        tr_input_pool["indices_subnodes"] = torch.Tensor(
+            new_node_indices).int()
         subgraph = dgl.node_subgraph(list_of_dgl_graphs[0], new_node_indices)
         tr_input_pool["node_data"] = subgraph.ndata["X"]
         return tr_input_pool
 
     def dglG_list_to_TrInputDict(self, graphs, sampled_original_indices=None):
-        device = graphs[0].ndata["X"].device
         comm = self._get_activated_communities(graphs)
         tr_input = defaultdict(list)
-        node_data_index = 0
         for t, activated_nodes in comm.items():
             # t 에 대해 comm 과 list_of_dgl_graphs 를 sync 하여 subgraph 를 생성
             if sampled_original_indices is not None:
                 indices = (
                     torch.concat(
-                        [torch.tensor(activated_nodes), sampled_original_indices]
+                        [torch.tensor(activated_nodes),
+                         sampled_original_indices]
                     )
                     .unique()
                     .tolist()
@@ -204,6 +207,26 @@ class ConvertGraphTypes:
 
         return tr_input
 
+    def dglG_list_to_TrInputDict_per_t(self, graphs):
+        comm = self._get_activated_communities(graphs)
+        tr_input = defaultdict(list)
+        for t, activated_nodes in comm.items():
+            # t 에 대해 comm 과 list_of_dgl_graphs 를 sync 하여 subgraph 를 생성
+            indices = activated_nodes
+            subgraph = dgl.node_subgraph(graphs[t], indices)
+            tr_input["indices_subnodes"] = torch.Tensor(indices).int()
+
+            # t 에서 가져온 subgraph 의 ndata 를 사용하므로 t 마다 ndata 가 달라도 문제없음
+            tr_input["node_data"] = subgraph.ndata["X"]
+            tr_input["edge_data"] = subgraph.edata["w"]
+            edge_tensor = torch.concat(
+                [subgraph.edges()[0].unsqueeze(0), subgraph.edges()[1].unsqueeze(0)])
+
+            tr_input["edge_index"] = edge_tensor
+            tr_input["node_num"] = [subgraph.num_nodes()]
+            tr_input["edge_num"] = [edge_tensor.shape[1]]
+            yield tr_input
+
     def weighted_adjacency_to_graph(self, adj, node_features):
         """
         Parameters
@@ -221,7 +244,8 @@ class ConvertGraphTypes:
         )
         graph.ndata["X"] = node_features
         graph.edata["w"] = (
-            adj.values().reshape(-1, 1).broadcast_to(-1, node_features.shape[1])
+            adj.values().reshape(-1, 1).broadcast_to(-1,
+                                                     node_features.shape[1])
         )
 
         graph.remove_edges(indices_to_be_removed)
@@ -233,7 +257,8 @@ class ConvertGraphTypes:
     def _get_activated_communities(self, list_of_dgl_graphs):
         comm = {}
         for t, dglG in enumerate(list_of_dgl_graphs):
-            activated_node_indices = torch.concat(dglG.edges()).unique().tolist()
+            activated_node_indices = torch.concat(
+                dglG.edges()).unique().tolist()
             comm[t] = activated_node_indices
 
         return comm
@@ -255,7 +280,7 @@ class ConvertGraphTypes:
         comm_id = 1
         size = max(minnum_nodes * 2, len(activated_node_indices))
         for i in range(0, len(deactivated_nodes), size):
-            comm[comm_id] = deactivated_nodes[i : i + size]
+            comm[comm_id] = deactivated_nodes[i: i + size]
             comm_id += 1
         return comm
 
@@ -265,7 +290,8 @@ class ConvertGraphTypes:
         eigval, eigvec = torch.linalg.eigh(sym_mat)
         # for eigval, take abs because torch sometimes computes the first eigenvalue approaching 0 from the negative
         eigvec = eigvec.float()  # [N, N (channels)]
-        eigval = torch.sort(torch.abs(torch.real(eigval)))[0]  # [N (channels),]
+        eigval = torch.sort(torch.abs(torch.real(eigval)))[
+            0]  # [N (channels),]
         return eigvec, eigval  # [N, N (channels)]  [N (channels),]
 
     def _lap_eig(self, dglG, sparse=True):

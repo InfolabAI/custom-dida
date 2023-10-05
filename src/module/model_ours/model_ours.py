@@ -50,7 +50,6 @@ class OurModel(nn.Module):
     def __init__(self, **_kwargs):
         super().__init__()
         args = _kwargs["args"]
-        args.num_nodes = _kwargs["graphs"].num_nodes
         self.args = args
         self.cgt = ConvertGraphTypes()
         self.gp = GeneratePool(args)
@@ -64,7 +63,8 @@ class OurModel(nn.Module):
 
         self.main_model = TokenGTModel.build_model(args).to(args.device)
         self.sample_nodes = SampleNodes(args)
-        self.scatter_and_gather = ScatterAndGather(args, args.encoder_embed_dim)
+        self.scatter_and_gather = ScatterAndGather(
+            args, args.encoder_embed_dim)
         self.cs_decoder = MultiplyPredictor()
 
         self.tr_input_pool = None
@@ -78,7 +78,8 @@ class OurModel(nn.Module):
         - graphs 를 input_graphs 로 변경"""
         for i in range(len(dataset)):
             dataset.input_graphs[i].ndata["X"] = dataset.graphs[i].ndata["X"]
-            dataset.input_graphs[i] = dataset.input_graphs[i].remove_self_loop()
+            dataset.input_graphs[i] = dataset.input_graphs[i].remove_self_loop(
+            )
             dataset.input_graphs[i].edata["w"] = (
                 dataset.input_graphs[i]
                 .edata["w"]
@@ -108,8 +109,8 @@ class OurModel(nn.Module):
         # 여기서 dataset 의 graphs 와 input_graphs 의 index 를 변경하면 안됨. trainer 에서 start, end 계산과 의존성이 있기 때문.
         graphs = dataset.graphs[:end]
         sampled_original_indices = None
-        graphs = copy.deepcopy(graphs)
 
+        # graphs = copy.deepcopy(graphs)
         # if self.args.num_division_edgeprop > 0:
         #    graphs, sampled_original_indices = self.sample_nodes(graphs)
 

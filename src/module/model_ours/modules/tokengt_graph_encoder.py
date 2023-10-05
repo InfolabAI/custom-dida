@@ -47,8 +47,8 @@ class TokenGTGraphEncoder(nn.Module):
         self,
         args,
         stochastic_depth: bool = False,
-        performer: bool = False,
-        performer_finetune: bool = False,
+        performer: bool = True,
+        performer_finetune: bool = True,
         performer_nb_features: int = None,
         performer_feature_redraw_interval: int = 1000,
         performer_generalized_attention: bool = False,
@@ -121,7 +121,8 @@ class TokenGTGraphEncoder(nn.Module):
             self.emb_layer_norm = None
 
         if layernorm_style == "prenorm":
-            self.final_layer_norm = LayerNorm(self.embedding_dim, export=export)
+            self.final_layer_norm = LayerNorm(
+                self.embedding_dim, export=export)
 
         if self.layerdrop > 0.0:
             self.layers = LayerDropModuleList(p=self.layerdrop)
@@ -184,7 +185,8 @@ class TokenGTGraphEncoder(nn.Module):
                     p.requires_grad = False
 
         if freeze_embeddings:
-            raise NotImplementedError("Freezing embeddings is not implemented yet.")
+            raise NotImplementedError(
+                "Freezing embeddings is not implemented yet.")
 
         for layer in range(n_trans_layers_to_freeze):
             freeze_module_params(self.layers[layer])
