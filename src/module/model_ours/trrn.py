@@ -52,8 +52,6 @@ class TRRN(torch.nn.Module):
         """
         super().__init__()
 
-        dimensions = [input_dim] + \
-            (num_layers - 1) * [hidden_dim] + [output_dim]
         self.layers = torch.nn.ModuleList()
         self.norms = torch.nn.ModuleList()
         self.dropout = torch.nn.Dropout(dropout)
@@ -79,14 +77,14 @@ class TRRN(torch.nn.Module):
         else:
             raise NotImplementedError("no such RNN model {}".format(rnn))
 
-        for layer in range(len(dimensions) - 1):
+        for layer in range(1):
             self.layers.append(
-                GNN(dimensions[layer], dimensions[layer + 1], normalize=False).to(
+                GNN(input_dim, num_nodes=self.args.num_nodes, normalize=False).to(
                     device
                 )
             )
             self.norms.append(
-                torch.nn.BatchNorm1d(dimensions[layer + 1], device=device)
+                torch.nn.BatchNorm1d(input_dim, device=device)
             )
 
     def _sync_graphs(self, dataset):
@@ -173,19 +171,14 @@ class TRRN(torch.nn.Module):
                     raise NotImplementedError(
                         "no such RNN model {}".format(self.rnn))
 
-                Hs_tmp.append(Ha[:, 1:, :])
+                Hs_tmp.append(Ha)
 
         lastHs = []
         for H, tokenized_input in zip(Hs_tmp, tokenized_input_list):
-            lastHs.append(H[tokenized_input[3], :])
+            lastHs.append(self.layers[0]._retrieve_nodes_from_X(H))
 
-        feature = self.scatter_and_gather._to_entire(
-            x_list=lastHs,
-            total_indices_subnodes=subgraph_indices_list,
-            graphs=input_graphs,
-        )
-
-        # feature = self.dropout(self.act(self.norm(torch.stack(Hs), norm)))
+        # feature = self.dropout(self.act(self.norm(torch.concat(lastHs), norm)))
+        feature = self.norm(torch.concat(lastHs), norm)
 
         """
         (Pdb) p feature.shape
@@ -199,45 +192,45 @@ class GTRLSTM(torch.nn.Module):
     def __init__(
         self,
         in_channels: int,
-        out_channels: int,
+        num_nodes: int,
         normalize: bool = True,
         bias: bool = True,
     ):
         super(GTRLSTM, self).__init__()
 
         self.in_channels = in_channels
-        self.out_channels = out_channels
         self.normalize = normalize
         self.bias = bias
         self._create_parameters_and_layers()
         self._set_parameters()
+        self.num_nodes = num_nodes
 
     def _create_input_gate_parameters_and_layers(self):
         self.tr_x_i = get_layer()
         self.tr_h_i = get_layer()
 
-        self.w_c_i = Parameter(torch.Tensor(1, self.out_channels))
-        self.b_i = Parameter(torch.Tensor(1, self.out_channels))
+        self.w_c_i = Parameter(torch.Tensor(1, self.in_channels))
+        self.b_i = Parameter(torch.Tensor(1, self.in_channels))
 
     def _create_forget_gate_parameters_and_layers(self):
         self.tr_x_f = get_layer()
         self.tr_h_f = get_layer()
 
-        self.w_c_f = Parameter(torch.Tensor(1, self.out_channels))
-        self.b_f = Parameter(torch.Tensor(1, self.out_channels))
+        self.w_c_f = Parameter(torch.Tensor(1, self.in_channels))
+        self.b_f = Parameter(torch.Tensor(1, self.in_channels))
 
     def _create_cell_state_parameters_and_layers(self):
         self.tr_x_c = get_layer()
         self.tr_h_c = get_layer()
 
-        self.b_c = Parameter(torch.Tensor(1, self.out_channels))
+        self.b_c = Parameter(torch.Tensor(1, self.in_channels))
 
     def _create_output_gate_parameters_and_layers(self):
         self.tr_x_o = get_layer()
         self.tr_h_o = get_layer()
 
-        self.w_c_o = Parameter(torch.Tensor(1, self.out_channels))
-        self.b_o = Parameter(torch.Tensor(1, self.out_channels))
+        self.w_c_o = Parameter(torch.Tensor(1, self.in_channels))
+        self.b_o = Parameter(torch.Tensor(1, self.in_channels))
 
     def _create_parameters_and_layers(self):
         self._create_input_gate_parameters_and_layers()
@@ -254,19 +247,25 @@ class GTRLSTM(torch.nn.Module):
         zeros(self.b_c)
         zeros(self.b_o)
 
-    def _set_state(self, X, H_or_C):
-        if H_or_C is None:
-            token = torch.zeros(X.shape[0], 1, X.shape[2]).to(X.device)
+    def _set_state(self, X, H):
+        if H is None:
+            H = torch.zeros_like(X)
         else:
-            token = self._retrieve_HC_from_combined_X(H_or_C)
-        return self._apply_H_or_C_to_X(token, X)
+            nodes = self._retrieve_nodes_from_X(H)
+            edges = self._retrieve_edges_from_X(X)
+            H = self._combine_nodes_and_edges(nodes, edges)
+        return H
 
-    def _apply_H_or_C_to_X(self, token, X):
-        return torch.concat([token, X], dim=1)
+    def _combine_nodes_and_edges(self, nodes, edges):
+        return torch.concat([nodes, edges], dim=1)
 
-    def _retrieve_HC_from_combined_X(self, combined_X):
-        token = combined_X[:, 0, :].unsqueeze(1)
-        return token
+    def _retrieve_edges_from_X(self, X):
+        edges = X[:, self.num_nodes:, :]
+        return edges
+
+    def _retrieve_nodes_from_X(self, X):
+        nodes = X[:, :self.num_nodes, :]
+        return nodes
 
     def _calculate_input_gate(self, X, H, C):
         I = self.tr_x_i(X)
@@ -356,7 +355,6 @@ class GTRLSTM(torch.nn.Module):
         """
         H = self._set_state(X, H)
         C = self._set_state(X, C)
-        X = self._set_state(X, None)
         H, C, X = H.transpose(0, 1), C.transpose(0, 1), X.transpose(0, 1)
         I = self._calculate_input_gate(X, H, C)
         F = self._calculate_forget_gate(X, H, C)

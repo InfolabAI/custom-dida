@@ -210,10 +210,13 @@ class ConvertGraphTypes:
     def dglG_list_to_TrInputDict_per_t(self, graphs):
         comm = self._get_activated_communities(graphs)
         tr_input = defaultdict(list)
+        indices = []
         for t, activated_nodes in comm.items():
             # t 에 대해 comm 과 list_of_dgl_graphs 를 sync 하여 subgraph 를 생성
-            indices = activated_nodes
-            subgraph = dgl.node_subgraph(graphs[t], indices)
+            # indices = activated_nodes
+            indices = [i for i in range(graphs[t].num_nodes())]
+            # subgraph = dgl.node_subgraph(graphs[t], indices)
+            subgraph = graphs[t]
             tr_input["indices_subnodes"] = torch.Tensor(indices).int()
 
             # t 에서 가져온 subgraph 의 ndata 를 사용하므로 t 마다 ndata 가 달라도 문제없음
