@@ -1,4 +1,5 @@
-import torch, dgl
+import torch
+import dgl
 from torch.nn import Parameter
 from torch_geometric.nn import GCNConv
 from torch_geometric.nn.inits import glorot, zeros
@@ -44,7 +45,8 @@ class GCRN(torch.nn.Module):
         """
         super().__init__()
 
-        dimensions = [input_dim] + (num_layers - 1) * [hidden_dim] + [output_dim]
+        dimensions = [input_dim] + \
+            (num_layers - 1) * [hidden_dim] + [output_dim]
         self.layers = torch.nn.ModuleList()
         self.norms = torch.nn.ModuleList()
         self.dropout = torch.nn.Dropout(dropout)
@@ -137,11 +139,13 @@ class GCRN(torch.nn.Module):
                 """
 
                 if self.rnn == "LSTM":
-                    H, C = layer(feat, indices, H=H, C=C, edge_weight=graph.edata["w"])
+                    H, C = layer(feat, indices, H=H, C=C,
+                                 edge_weight=graph.edata["w"])
                 elif self.rnn == "GRU":
                     H = layer(feat, indices, H=H, edge_weight=graph.edata["w"])
                 else:
-                    raise NotImplementedError("no such RNN model {}".format(self.rnn))
+                    raise NotImplementedError(
+                        "no such RNN model {}".format(self.rnn))
 
                 Hs.append(H)
 
@@ -279,7 +283,8 @@ class GConvGRU(torch.nn.Module):
         H = self._set_hidden_state(X, H)
         Z = self._calculate_update_gate(X, edge_index, edge_weight, H)
         R = self._calculate_reset_gate(X, edge_index, edge_weight, H)
-        H_tilde = self._calculate_candidate_state(X, edge_index, edge_weight, H, R)
+        H_tilde = self._calculate_candidate_state(
+            X, edge_index, edge_weight, H, R)
         H = self._calculate_hidden_state(Z, H, H_tilde)
         return H
 
@@ -473,7 +478,6 @@ class GConvLSTM(torch.nn.Module):
             * **H** *(PyTorch Float Tensor)* - Hidden state matrix for all nodes.
             * **C** *(PyTorch Float Tensor)* - Cell state matrix for all nodes.
         """
-        breakpoint()
         """
         (Pdb) p X.shape
         torch.Size([7125, 32])

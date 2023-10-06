@@ -156,35 +156,36 @@ class TRRN(torch.nn.Module):
 
         Hs_tmp = []
         for layer, norm in zip(self.layers, self.norms):
-            H = None
-            C = None
+            Ha = None
+            Ca = None
             Hs = [tokenized_input[0]
                   for tokenized_input in tokenized_input_list] if len(Hs_tmp) == 0 else Hs_tmp
 
             Hs_tmp = []
-            for t, H in enumerate(Hs):
-                x = H
+
+            for t, h in enumerate(Hs):
+                x = h
                 if self.rnn == "LSTM":
-                    H, C = layer(x, H=H, C=C)
+                    Ha, Ca = layer(x, H=Ha, C=Ca)
                 elif self.rnn == "GRU":
                     H = layer(x, H=H)
                 else:
                     raise NotImplementedError(
                         "no such RNN model {}".format(self.rnn))
 
-                Hs_tmp.append(H[:, 1:, :])
+                Hs_tmp.append(Ha[:, 1:, :])
 
         lastHs = []
         for H, tokenized_input in zip(Hs_tmp, tokenized_input_list):
             lastHs.append(H[tokenized_input[3], :])
-
-        # feature = self.dropout(self.act(self.norm(torch.stack(Hs), norm)))
 
         feature = self.scatter_and_gather._to_entire(
             x_list=lastHs,
             total_indices_subnodes=subgraph_indices_list,
             graphs=input_graphs,
         )
+
+        # feature = self.dropout(self.act(self.norm(torch.stack(Hs), norm)))
 
         """
         (Pdb) p feature.shape
@@ -255,17 +256,17 @@ class GTRLSTM(torch.nn.Module):
 
     def _set_state(self, X, H_or_C):
         if H_or_C is None:
-            Htoken = torch.zeros(X.shape[0], 1, X.shape[2]).to(X.device)
+            token = torch.zeros(X.shape[0], 1, X.shape[2]).to(X.device)
         else:
-            Htoken = self._retrieve_HC_from_combined_X(H_or_C)
-        return self._apply_H_or_C_to_X(X, Htoken)
+            token = self._retrieve_HC_from_combined_X(H_or_C)
+        return self._apply_H_or_C_to_X(token, X)
 
-    def _apply_H_or_C_to_X(self, X, H_or_C):
-        return torch.concat([H_or_C, X], dim=1)
+    def _apply_H_or_C_to_X(self, token, X):
+        return torch.concat([token, X], dim=1)
 
     def _retrieve_HC_from_combined_X(self, combined_X):
-        H_or_C = combined_X[:, 0, :].unsqueeze(1)
-        return H_or_C
+        token = combined_X[:, 0, :].unsqueeze(1)
+        return token
 
     def _calculate_input_gate(self, X, H, C):
         I = self.tr_x_i(X)
@@ -356,9 +357,11 @@ class GTRLSTM(torch.nn.Module):
         H = self._set_state(X, H)
         C = self._set_state(X, C)
         X = self._set_state(X, None)
+        H, C, X = H.transpose(0, 1), C.transpose(0, 1), X.transpose(0, 1)
         I = self._calculate_input_gate(X, H, C)
         F = self._calculate_forget_gate(X, H, C)
         C = self._calculate_cell_state(X, H, C, I, F)
         O = self._calculate_output_gate(X, H, C)
         H = self._calculate_hidden_state(O, C)
+        H, C = H.transpose(0, 1), C.transpose(0, 1)
         return H, C
